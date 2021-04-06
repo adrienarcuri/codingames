@@ -1,3 +1,8 @@
+//TODO:
+// [x] Take 3 files at a time in the SAMPLES Module
+// [ ] Diagnose 3 files at a time in the DIAGNOSIS Module
+// [ ] Produce the 3 files at a time at the LABORATORY Module
+
 import 'dart:io';
 
 /// ENUMS
@@ -372,7 +377,7 @@ class Commands {
 class State {
   StateType _state;
   File _chosenFile;
-  bool hasSample = false;
+  bool has3Samples = false;
 
   bool get hasFile => _chosenFile != null;
   bool get hasMolecules => Game.player0.robot.hasDiagFile
@@ -382,15 +387,21 @@ class State {
   StateType get state => _state;
 
   evalState() {
+    // OBSERVE VARIABLES
+    if (Game.player0.robot.files.length == 3) {
+      has3Samples = true;
+    }
+    // EVAL STATE
+    // If the robot is moving Moving, the state is MOVING
     if (Game.player0.robot.eta > 0) {
       _state = StateType.MOVING;
-    } else if (!hasSample && !hasFile && !hasMolecules) {
+    } else if (!has3Samples && !hasFile && !hasMolecules) {
       _state = StateType.CHOOSE;
-    } else if (hasSample && !hasFile && !hasMolecules) {
+    } else if (has3Samples && !hasFile && !hasMolecules) {
       _state = StateType.ANALYSE;
-    } else if (hasSample && hasFile && !hasMolecules) {
+    } else if (has3Samples && hasFile && !hasMolecules) {
       _state = StateType.COLLECT;
-    } else if (hasSample && hasFile && hasMolecules) {
+    } else if (has3Samples && hasFile && hasMolecules) {
       _state = StateType.PRODUCE;
     }
   }
@@ -408,7 +419,6 @@ class State {
         // Else choose a file
         else {
           var rank = 1;
-          hasSample = true;
           Commands.connectSamples(rank);
         }
         break;
@@ -448,7 +458,7 @@ class State {
         // Else produce
         else {
           var fileId = _chosenFile.id;
-          hasSample = false;
+          has3Samples = false;
           _chosenFile = null;
           Commands.connectLaboratory(fileId.toString());
         }
@@ -459,7 +469,7 @@ class State {
 
   @override
   String toString() {
-    return 'State:\n state: ${Util.toShortString(state)}, chosenFile: $chosenFile, hasFile: $hasFile, hasDiagFile: $hasSample, hasMolecules: $hasMolecules';
+    return 'State:\n state: ${Util.toShortString(state)}, chosenFile: $chosenFile, hasFile: $hasFile, hasDiagFile: $has3Samples, hasMolecules: $hasMolecules';
   }
 }
 
