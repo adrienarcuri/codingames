@@ -1,8 +1,3 @@
-//TODO:
-// [x] Take 3 files at a time in the SAMPLES Module
-// [ ] Diagnose 3 files at a time in the DIAGNOSIS Module
-// [ ] Produce the 3 files at a time at the LABORATORY Module
-
 import 'dart:io';
 
 /// ENUMS
@@ -27,6 +22,7 @@ enum StateType {
   ANALYSE,
   COLLECT,
   PRODUCE,
+  UNDEFINED,
 }
 
 /// DEBUG
@@ -154,7 +150,7 @@ class Project {
 
 /// ROBOT
 class Robot {
-  static const int maxFile = 3;
+  static const int maxFiles = 3;
   static const int maxMolecules = 10;
 
   Robot({
@@ -186,23 +182,54 @@ class Robot {
 
   bool get hasCarriedFile => files.isNotEmpty;
 
-  bool get hasDiagFile {
-    var file =
-        files.firstWhere((file) => file.health != -1, orElse: () => null);
-
-    if (file != null) {
-      return true;
+  /// Return true if all files carried by the robot are diagnosed, else return false
+  bool get isAllDiagFiles {
+    if (files.isEmpty) {
+      return false;
     }
-    return false;
+
+    if (files.where((file) => file.isDiagnosed).length == files.length) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
-  List<File> getDiagFiles() =>
-      files.where((file) => file.health != -1).toList();
+  /// Get the list of diagnosed files
+  List<File> getDiagFiles() => files.where((file) => file.isDiagnosed).toList();
 
+  /// Get the list of non-diagnosed files
   List<File> getNonDiagFiles() =>
-      files.where((file) => file.health == -1).toList();
+      files.where((file) => !file.isDiagnosed).toList();
 
-  bool canProduce(File f) {
+  /// Sort files by ascendant ratio
+  void _sortFilesByRatio() {
+    files.sort((a, b) => a.ratio.compareTo(b.ratio));
+  }
+
+  /// Return the file with the maximum ratio
+  File getFileWithMaxRatio() {
+    if (files.isEmpty) {
+      return null;
+    }
+    _sortFilesByRatio();
+    return files.last;
+  }
+
+  /// Return the first file the robot can produce, else return null
+  File canProduceAFile() {
+    for (var f in files) {
+      if (_canProduce(f)) {
+        debug('****');
+        debug(f);
+        return f;
+      }
+    }
+    return null;
+  }
+
+  /// Return true if the robot has enough molecules to produce the file [f]
+  bool _canProduce(File f) {
     if (f == null) {
       return false;
     }
@@ -310,6 +337,9 @@ class File {
   /// Return the ratio of earned health by total cost in molecule
   double get ratio => health / totalCost;
 
+  /// Return true is the file is diagnosed, else return false
+  bool get isDiagnosed => health != -1;
+
   @override
   String toString() {
     var s = 'FILE:';
@@ -376,33 +406,38 @@ class Commands {
 /// STATE MACHINE
 class State {
   StateType _state;
-  File _chosenFile;
-  bool has3Samples = false;
+  bool hasAllSamples = false;
+  bool isAllDiagFiles = false;
+  bool canProduceAFile = false;
 
-  bool get hasFile => _chosenFile != null;
-  bool get hasMolecules => Game.player0.robot.hasDiagFile
-      ? Game.player0.robot.canProduce(Game.player0.robot.getDiagFiles().first)
-      : false;
-  File get chosenFile => _chosenFile;
   StateType get state => _state;
 
   evalState() {
     // OBSERVE VARIABLES
     if (Game.player0.robot.files.length == 3) {
-      has3Samples = true;
+      hasAllSamples = true;
     }
+    if (Game.player0.robot.isAllDiagFiles) {
+      isAllDiagFiles = true;
+    }
+    if (Game.player0.robot.canProduceAFile() != null) {
+      canProduceAFile = true;
+    }
+
     // EVAL STATE
     // If the robot is moving Moving, the state is MOVING
     if (Game.player0.robot.eta > 0) {
       _state = StateType.MOVING;
-    } else if (!has3Samples && !hasFile && !hasMolecules) {
+    } else if (!hasAllSamples && !isAllDiagFiles && !canProduceAFile) {
       _state = StateType.CHOOSE;
-    } else if (has3Samples && !hasFile && !hasMolecules) {
+    } else if (hasAllSamples && !isAllDiagFiles && !canProduceAFile) {
       _state = StateType.ANALYSE;
-    } else if (has3Samples && hasFile && !hasMolecules) {
+    } else if (isAllDiagFiles && !canProduceAFile) {
       _state = StateType.COLLECT;
-    } else if (has3Samples && hasFile && hasMolecules) {
+    } else if (isAllDiagFiles && canProduceAFile) {
       _state = StateType.PRODUCE;
+    } else {
+      _state = StateType.UNDEFINED;
     }
   }
 
@@ -410,6 +445,7 @@ class State {
     switch (_state) {
       case StateType.MOVING:
         Commands.wait();
+
         break;
       case StateType.CHOOSE:
         // If Robot is not in DIAGNOSIS Module, go there
@@ -429,8 +465,8 @@ class State {
         }
         // Else choose a file
         else {
-          _chosenFile = Game.player0.robot.getNonDiagFiles().first;
-          Commands.connectDiagnosis(_chosenFile.id.toString());
+          var nonDiagFile = Game.player0.robot.getNonDiagFiles().first;
+          Commands.connectDiagnosis(nonDiagFile.id.toString());
         }
         break;
       case StateType.COLLECT:
@@ -440,8 +476,8 @@ class State {
         }
         // Else collect molecules
         else {
-          var moleculeType = Game.player0.robot
-              .whichMoleculeToCollect(Game.player0.robot.getDiagFiles().first);
+          var file = Game.player0.robot.getFileWithMaxRatio();
+          var moleculeType = Game.player0.robot.whichMoleculeToCollect(file);
           // If we cannot collect molecule, wait
           if (moleculeType == null) {
             Commands.wait();
@@ -457,19 +493,32 @@ class State {
         }
         // Else produce
         else {
-          var fileId = _chosenFile.id;
-          has3Samples = false;
-          _chosenFile = null;
-          Commands.connectLaboratory(fileId.toString());
+          File file = Game.player0.robot.canProduceAFile();
+          debug('***');
+
+          debug(file);
+          Commands.connectLaboratory(file.id.toString());
         }
         break;
+      case StateType.UNDEFINED:
+        Commands.wait();
+        break;
       default:
+        Commands.wait();
     }
   }
 
   @override
   String toString() {
-    return 'State:\n state: ${Util.toShortString(state)}, chosenFile: $chosenFile, hasFile: $hasFile, hasDiagFile: $has3Samples, hasMolecules: $hasMolecules';
+    var s = 'STATE:\n';
+    var props = [
+      'state:${Util.toShortString(state)}',
+      'hasAllSamples:$hasAllSamples',
+      'isAllDiagFiles:$isAllDiagFiles',
+      'canProduceAFile:$canProduceAFile',
+    ].join(' ');
+    s += props;
+    return s;
   }
 }
 
@@ -556,8 +605,6 @@ void main() {
 
     Game.projects.add(Project(a, b, c, d, e));
   }
-
-  State state = State();
 
   bool isFirstTurn = true;
 
@@ -663,10 +710,10 @@ void main() {
      */
 
     Game.show();
+    State state = State();
 
     state.evalState();
-
-    //debug(state);
+    debug(state);
 
     state.actions();
   }
