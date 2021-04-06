@@ -95,6 +95,19 @@ class Player {
   /// Robot of the player
   Robot robot;
 
+  /// Return the sum of all expertises
+  int getTotalExpertise() {
+    var total = expertiseA + expertiseB + expertiseC + expertiseD + expertiseE;
+
+    return total;
+  }
+
+  /// Return true if each expertise type is greater than [min]
+  bool isEachExpertiseGreaterOrEqualThan(int min) {
+    return [expertiseA, expertiseB, expertiseC, expertiseD, expertiseE]
+        .every((e) => e >= min);
+  }
+
   @override
   String toString() {
     return 'PLAYER- '
@@ -194,6 +207,11 @@ class Robot {
     }
   }
 
+  /// Return the number of file which have rank [r]
+  int getRankCount(int r) {
+    return files.where((file) => file.isRank(r)).length;
+  }
+
   /// Get the list of diagnosed files
   List<File> getDiagFiles() => files.where((file) => file.isDiagnosed).toList();
 
@@ -219,8 +237,6 @@ class Robot {
   File canProduceAFile(Player p) {
     for (var f in files) {
       if (_canProduce(f, p)) {
-        debug('****');
-        debug(f);
         return f;
       }
     }
@@ -339,6 +355,11 @@ class File {
   /// Return true is the file is diagnosed, else return false
   bool get isDiagnosed => health != -1;
 
+  /// Return true if rank equals [r]
+  bool isRank(int r) {
+    return rank == r;
+  }
+
   @override
   String toString() {
     var s = 'FILE:';
@@ -454,6 +475,13 @@ class State {
         // Else choose a file
         else {
           var rank = 1;
+          // If expertise is greater or equal than 3 and number of files with rank 2 is less than 2, take a file of rank 2
+          if (Game.player0.isEachExpertiseGreaterOrEqualThan(1)) {
+            rank = 2;
+          }
+          if (Game.player0.isEachExpertiseGreaterOrEqualThan(2)) {
+            rank = 3;
+          }
           Commands.connectSamples(rank);
         }
         break;
@@ -494,9 +522,7 @@ class State {
         // Else produce
         else {
           File file = Game.player0.robot.canProduceAFile(Game.player0);
-          debug('***');
 
-          debug(file);
           Commands.connectLaboratory(file.id.toString());
         }
         break;
@@ -709,11 +735,11 @@ void main() {
      * GAME LOGIC
      */
 
-    //Game.show();
+    Game.show();
     State state = State();
 
     state.evalState();
-    debug(state);
+    //debug(state);
 
     state.actions();
   }
