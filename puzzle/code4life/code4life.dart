@@ -79,7 +79,7 @@ class Player {
 
   @override
   String toString() {
-    return 'PLAYER-'
+    return 'PLAYER- '
         'id: $id '
         'id: $score '
         'expertiseA: $expertiseA '
@@ -113,6 +113,21 @@ class Project {
 
   /// Required expertise for E molecule
   int expertiseE;
+
+  @override
+  String toString() {
+    var s = 'PROJECT:'
+        '\n ';
+    var props = [
+      'expertiseA:$expertiseA',
+      'expertiseB:$expertiseB',
+      'expertiseC:$expertiseC',
+      'expertiseD:$expertiseD',
+      'expertiseE:$expertiseE',
+    ].join(' ');
+    s += props;
+    return s;
+  }
 }
 
 /// ROBOT
@@ -217,7 +232,15 @@ class Robot {
 
   @override
   String toString() {
-    return 'Robot\n target: ${Util.toShortString(target)}, storageA: $storageA, storageB: $storageB, storageC: $storageC, storageD: $storageD, storageE: $storageE';
+    return 'ROBOT- '
+        'target: ${Util.toShortString(target)} '
+        'eta: $eta '
+        'storageA: $storageA '
+        'storageB: $storageB '
+        'storageC: $storageC '
+        'storageD: $storageD '
+        'storageE: $storageE '
+        'files: $files';
   }
 }
 
@@ -236,10 +259,19 @@ class File {
     this.costE,
   });
 
+  /// id of the file
   int id;
+
+  /// indicates if the file is carried by a player (not carried:-1, player0: 0, player1: 1)
   int carriedBy;
+
+  /// health of the file
   int health;
+
+  /// Rank of the file
   int rank;
+
+  /// Expertise gain of the file in A, B, C, D E
   String gain;
 
   int costA;
@@ -248,42 +280,67 @@ class File {
   int costD;
   int costE;
 
+  /// Return the total cost in molecule
   int get totalCost => costA + costB + costC + costD + costE;
 
+  /// Return the ratio of earned health by total cost in molecule
   double get ratio => health / totalCost;
 
   @override
   String toString() {
-    return 'File\n id: $id, carriedBy: $carriedBy, health: $health, rank: $rank, gain: $gain, costA: $costA, costB: $costB, costC: $costC, costD: $costD, costE: $costE,';
+    var s = 'FILE:';
+    var props = [
+      'id:$id',
+      'carriedBy:$carriedBy',
+      'health:$health',
+      'rank:$rank',
+      'gain:$gain',
+      'costA:$costA',
+      'costB:$costB',
+      'costC:$costC',
+      'costD:$costD',
+      'costE:$costE',
+    ].join(' ');
+    s += props;
+    return s;
   }
 }
 
 /// COMMANDS
 class Commands {
+  ///  Make the robot go the specific module [moduleType]
   static void goTo(ModuleType moduleType) {
     String moduleName = Util.toShortString(moduleType);
     print('GOTO $moduleName');
   }
 
-  static void _connect(String e) {
-    print('CONNECT $e');
-  }
-
-  static void connectDiagnosis(String fileId) {
-    _connect(fileId);
-  }
-
-  static void connectLaboratory(String fileId) {
-    _connect(fileId);
-  }
-
+  /// Make the robot get a sample file of a specific [rank]
   static void connectSamples(int rank) {
     _connect(rank.toString());
   }
 
+  /// Make the robot connect to the Diagnosis Module to diagnose the file [fileId]
+  ///
+  /// The robot must care the file of id [fileId]
+  static void connectDiagnosis(String fileId) {
+    _connect(fileId);
+  }
+
+  /// Make the robot connect the Molecules Module to create a molecule of type [moleculeType]
   static void connectMolecules(MoleculeType moleculeType) {
     String moleculeName = Util.toShortString(moleculeType);
     _connect(moleculeName);
+  }
+
+  /// Make the robot connect to the Laboratory Module to create medecines for the file [fileId]
+  ///
+  /// The robot should care the file of id [fileId]
+  static void connectLaboratory(String fileId) {
+    _connect(fileId);
+  }
+
+  static void _connect(String e) {
+    print('CONNECT $e');
   }
 }
 
@@ -375,10 +432,10 @@ class State {
 /// The GAME
 class Game {
   /// List of scientific projects
-  static List<Project> projects;
+  static List<Project> projects = [];
 
   /// List of files
-  static List<File> files;
+  static List<File> files = [];
 
   /// The players
   static Player player0;
@@ -403,10 +460,28 @@ class Game {
     player1.robot.files = _getPlayerCarriedFiles(1);
   }
 
+  /// Get the files carried by [playerId]
   static List<File> _getPlayerCarriedFiles(playerId) {
+    if (files.isEmpty) {
+      return [];
+    }
     var _files = [...files];
     _files.retainWhere((element) => element.carriedBy == playerId);
     return _files;
+  }
+
+  static void show() {
+    String s = 'GAME:' '\n ';
+
+    var props = [
+      'availables: A:$availableA B:$availableB C:$availableC D:$availableD E:$availableE',
+      'projects: \n[\n  ${projects.join('\n  ')}\n]',
+      'files: \n${files.join('\n')}',
+      'player0:$player0',
+      'player1:$player1',
+    ].join('\n ');
+    s += props;
+    debug(s);
   }
 }
 
@@ -528,9 +603,15 @@ void main() {
 
     Game.updateCariedFilesForAllPlayers();
 
+    /**
+     * GAME LOGIC
+     */
+
+    Game.show();
+
     state.evalState();
 
-    debug(state);
+    //debug(state);
 
     state.actions();
   }
