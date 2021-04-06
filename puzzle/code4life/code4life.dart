@@ -228,23 +228,25 @@ class Robot {
     return true;
   }
 
+  /// Return the molecule the robot must collect to complete the file [f]
   MoleculeType whichMoleculeToCollect(File f) {
-    if (storageA < f.costA) {
+    if (storageA < f.costA && Game.availableA > 0) {
       return MoleculeType.A;
     }
-    if (storageB < f.costB) {
+    if (storageB < f.costB && Game.availableB > 0) {
       return MoleculeType.B;
     }
-    if (storageC < f.costC) {
+    if (storageC < f.costC && Game.availableC > 0) {
       return MoleculeType.C;
     }
-    if (storageD < f.costD) {
+    if (storageD < f.costD && Game.availableD > 0) {
       return MoleculeType.D;
     }
-    if (storageE < f.costE) {
+    if (storageE < f.costE && Game.availableE > 0) {
       return MoleculeType.E;
     }
-    return MoleculeType.A;
+    // If no molecule are available to complete the file, return null
+    return null;
   }
 
   @override
@@ -430,7 +432,12 @@ class State {
         else {
           var moleculeType = Game.player0.robot
               .whichMoleculeToCollect(Game.player0.robot.getDiagFiles().first);
-          Commands.connectMolecules(moleculeType);
+          // If we cannot collect molecule, wait
+          if (moleculeType == null) {
+            Commands.wait();
+          } else {
+            Commands.connectMolecules(moleculeType);
+          }
         }
         break;
       case StateType.PRODUCE:
