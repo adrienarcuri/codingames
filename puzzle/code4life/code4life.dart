@@ -134,8 +134,7 @@ class Project {
 
   @override
   String toString() {
-    var s = 'PROJECT:'
-        '\n ';
+    var s = '';
     var props = [
       'expertiseA:$expertiseA',
       'expertiseB:$expertiseB',
@@ -217,9 +216,9 @@ class Robot {
   }
 
   /// Return the first file the robot can produce, else return null
-  File canProduceAFile() {
+  File canProduceAFile(Player p) {
     for (var f in files) {
-      if (_canProduce(f)) {
+      if (_canProduce(f, p)) {
         debug('****');
         debug(f);
         return f;
@@ -229,7 +228,7 @@ class Robot {
   }
 
   /// Return true if the robot has enough molecules to produce the file [f]
-  bool _canProduce(File f) {
+  bool _canProduce(File f, Player p) {
     if (f == null) {
       return false;
     }
@@ -242,39 +241,39 @@ class Robot {
       return false;
     }
 
-    if (storageA < f.costA) {
+    if (storageA < f.costA - p.expertiseA) {
       return false;
     }
-    if (storageB < f.costB) {
+    if (storageB < f.costB - p.expertiseB) {
       return false;
     }
-    if (storageC < f.costC) {
+    if (storageC < f.costC - p.expertiseC) {
       return false;
     }
-    if (storageD < f.costD) {
+    if (storageD < f.costD - p.expertiseD) {
       return false;
     }
-    if (storageE < f.costE) {
+    if (storageE < f.costE - p.expertiseE) {
       return false;
     }
     return true;
   }
 
   /// Return the molecule the robot must collect to complete the file [f]
-  MoleculeType whichMoleculeToCollect(File f) {
-    if (storageA < f.costA && Game.availableA > 0) {
+  MoleculeType whichMoleculeToCollect(File f, Player p) {
+    if ((storageA + p.expertiseA) < f.costA && Game.availableA > 0) {
       return MoleculeType.A;
     }
-    if (storageB < f.costB && Game.availableB > 0) {
+    if ((storageB + p.expertiseB) < f.costB && Game.availableB > 0) {
       return MoleculeType.B;
     }
-    if (storageC < f.costC && Game.availableC > 0) {
+    if ((storageC + p.expertiseC) < f.costC && Game.availableC > 0) {
       return MoleculeType.C;
     }
-    if (storageD < f.costD && Game.availableD > 0) {
+    if ((storageD + p.expertiseD) < f.costD && Game.availableD > 0) {
       return MoleculeType.D;
     }
-    if (storageE < f.costE && Game.availableE > 0) {
+    if ((storageE + p.expertiseE) < f.costE && Game.availableE > 0) {
       return MoleculeType.E;
     }
     // If no molecule are available to complete the file, return null
@@ -420,7 +419,7 @@ class State {
     if (Game.player0.robot.isAllDiagFiles) {
       isAllDiagFiles = true;
     }
-    if (Game.player0.robot.canProduceAFile() != null) {
+    if (Game.player0.robot.canProduceAFile(Game.player0) != null) {
       canProduceAFile = true;
     }
 
@@ -430,7 +429,7 @@ class State {
       _state = StateType.MOVING;
     } else if (!hasAllSamples && !isAllDiagFiles && !canProduceAFile) {
       _state = StateType.CHOOSE;
-    } else if (hasAllSamples && !isAllDiagFiles && !canProduceAFile) {
+    } else if (hasAllSamples && !isAllDiagFiles) {
       _state = StateType.ANALYSE;
     } else if (isAllDiagFiles && !canProduceAFile) {
       _state = StateType.COLLECT;
@@ -477,7 +476,8 @@ class State {
         // Else collect molecules
         else {
           var file = Game.player0.robot.getFileWithMaxRatio();
-          var moleculeType = Game.player0.robot.whichMoleculeToCollect(file);
+          var moleculeType =
+              Game.player0.robot.whichMoleculeToCollect(file, Game.player0);
           // If we cannot collect molecule, wait
           if (moleculeType == null) {
             Commands.wait();
@@ -493,7 +493,7 @@ class State {
         }
         // Else produce
         else {
-          File file = Game.player0.robot.canProduceAFile();
+          File file = Game.player0.robot.canProduceAFile(Game.player0);
           debug('***');
 
           debug(file);
@@ -709,7 +709,7 @@ void main() {
      * GAME LOGIC
      */
 
-    Game.show();
+    //Game.show();
     State state = State();
 
     state.evalState();
