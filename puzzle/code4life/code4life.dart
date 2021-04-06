@@ -5,7 +5,24 @@ enum MoleculeType { A, B, C, D, E }
 
 enum ModuleType { DIAGNOSIS, MOLECULES, LABORATORY, SAMPLES, CENTER }
 
-enum StateType { CHOOSE, ANALYSE, COLLECT, PRODUCE }
+/// Represents the immutable state of the Robot:
+///
+/// MOVING : the robot is moving from one Module to another
+///
+/// CHOOSE: the robot is Choosing a file at the SAMPLES Module
+///
+/// ANALYSE: the robot is Analysing file at the DIAGNOSIS Module
+///
+/// COLLECT: the robot is Collecting molecules at the MOLECULES Module
+///
+/// PRODUCE: the robot is Producing medecines at the LABORATOEY Module
+enum StateType {
+  MOVING,
+  CHOOSE,
+  ANALYSE,
+  COLLECT,
+  PRODUCE,
+}
 
 /// DEBUG
 void debug(e) => stderr.writeln(e);
@@ -308,6 +325,11 @@ class File {
 
 /// COMMANDS
 class Commands {
+  ///  Make the robot do nothing (or keep the robot moving)
+  static void wait() {
+    print('WAIT');
+  }
+
   ///  Make the robot go the specific module [moduleType]
   static void goTo(ModuleType moduleType) {
     String moduleName = Util.toShortString(moduleType);
@@ -358,7 +380,9 @@ class State {
   StateType get state => _state;
 
   evalState() {
-    if (!hasSample && !hasFile && !hasMolecules) {
+    if (Game.player0.robot.eta > 0) {
+      _state = StateType.MOVING;
+    } else if (!hasSample && !hasFile && !hasMolecules) {
       _state = StateType.CHOOSE;
     } else if (hasSample && !hasFile && !hasMolecules) {
       _state = StateType.ANALYSE;
@@ -371,6 +395,9 @@ class State {
 
   actions() {
     switch (_state) {
+      case StateType.MOVING:
+        Commands.wait();
+        break;
       case StateType.CHOOSE:
         // If Robot is not in DIAGNOSIS Module, go there
         if (ModuleType.SAMPLES != Game.player0.robot.target) {
@@ -454,8 +481,18 @@ class Game {
   /// Get the number of files
   int get filesCount => files.length;
 
+  /// Update all the files with [newfiles] (also update for players)
+  static updateFiles(List<File> newfiles) {
+    if (newfiles == null) {
+      files = [];
+    } else {
+      files = newfiles;
+    }
+    Game._updateCariedFilesForAllPlayers();
+  }
+
   /// Update the carried files for all players
-  static updateCariedFilesForAllPlayers() {
+  static _updateCariedFilesForAllPlayers() {
     player0.robot.files = _getPlayerCarriedFiles(0);
     player1.robot.files = _getPlayerCarriedFiles(1);
   }
@@ -572,6 +609,7 @@ void main() {
     int sampleCount = int.parse(stdin.readLineSync());
 
     /// PROVIDE FILES
+    List<File> newfiles = [];
     for (int i = 0; i < sampleCount; i++) {
       inputs = stdin.readLineSync().split(' ');
       int sampleId = int.parse(inputs[0]);
@@ -598,10 +636,10 @@ void main() {
         costE: costE,
       );
 
-      Game.files.add(file);
+      newfiles.add(file);
     }
 
-    Game.updateCariedFilesForAllPlayers();
+    Game.updateFiles(newfiles);
 
     /**
      * GAME LOGIC
