@@ -1,3 +1,6 @@
+/// TODO
+// [ ] Better allocate SAMPLES rank
+// [ ] Store files in the cloud if we cannot produce it
 import 'dart:io';
 
 import 'dart:math';
@@ -18,12 +21,15 @@ enum ModuleType { DIAGNOSIS, MOLECULES, LABORATORY, SAMPLES, CENTER }
 /// COLLECT: the robot is Collecting molecules at the MOLECULES Module
 ///
 /// PRODUCE: the robot is Producing medecines at the LABORATOEY Module
+///
+/// STORE: the robot is storing files on the cloud (because he cannot handle them)
 enum StateType {
   MOVING,
   CHOOSE,
   ANALYSE,
   COLLECT,
   PRODUCE,
+  STORE,
   UNDEFINED,
 }
 
@@ -238,7 +244,7 @@ class Project {
   String toString() {
     var s = '';
     var props = [
-      'expertises:${Util.displayMap(expertises)}',
+      '${Util.displayMap(expertises)}',
     ].join(' ');
     s += props;
     return s;
@@ -487,6 +493,7 @@ class Commands {
 /// STATE MACHINE
 class State {
   StateType _state;
+
   bool hasAllSamples = false;
   bool isAllDiagFiles = false;
   bool canProduceAFile = false;
@@ -525,6 +532,8 @@ class State {
       _state = StateType.COLLECT;
     } else if (isAllDiagFiles && canProduceAFile) {
       _state = StateType.PRODUCE;
+    } else if (!canCollectMoleculeForAtLeastOneDiagFile) {
+      _state = StateType.STORE;
     } else {
       _state = StateType.UNDEFINED;
     }
@@ -545,10 +554,14 @@ class State {
         else {
           var rank = 1;
           // If expertise is greater or equal than 3 and number of files with rank 2 is less than 2, take a file of rank 2
-          if (Game.player0.getTotalExpertise() >= 6) {
+          if (Game.player0.getTotalExpertise() +
+                  Game.player0.robot.files.length >=
+              5) {
             rank = 2;
           }
-          if (Game.player0.getTotalExpertise() >= 9) {
+          if (Game.player0.getTotalExpertise() +
+                  Game.player0.robot.files.length >=
+              8) {
             rank = 3;
           }
           Commands.connectSamples(rank);
@@ -595,6 +608,17 @@ class State {
           Commands.connectLaboratory(file.id.toString());
         }
         break;
+      case StateType.STORE:
+        // If Robot is not in DIAGNOSIS Module, go there
+        if (ModuleType.DIAGNOSIS != Game.player0.robot.target) {
+          Commands.goTo(ModuleType.DIAGNOSIS);
+        }
+        // Else choose a file to store in the cloud
+        else {
+          var fileToStore = Game.player0.robot.files.first;
+          Commands.connectDiagnosis(fileToStore.id.toString());
+        }
+        break;
       case StateType.UNDEFINED:
         Commands.wait();
         break;
@@ -611,6 +635,7 @@ class State {
       'hasAllSamples:$hasAllSamples',
       'isAllDiagFiles:$isAllDiagFiles',
       'canProduceAFile:$canProduceAFile',
+      'canCollectMoleculeForAtLeastOneDiagFile:$canCollectMoleculeForAtLeastOneDiagFile'
     ].join(' ');
     s += props;
     return s;
@@ -671,7 +696,7 @@ class Game {
 
     var props = [
       'availables: ${Util.displayMap(availables)}',
-      'projects: \n  ${projects.join('\n  ')}',
+      'projects: ${projects.join(' ')}',
       'files: \n${files.join('\n')}',
       'player0:$player0',
       'player1:$player1',
