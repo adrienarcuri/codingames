@@ -2,6 +2,8 @@
 // [ ] Produce the file which the more helpful expertise to make the 2 other files
 import 'dart:io';
 
+import 'dart:math';
+
 /// ENUMS
 enum MoleculeType { A, B, C, D, E }
 
@@ -240,9 +242,40 @@ class Robot {
     return files.last;
   }
 
-  File getFileWithTheMoreHelpfulExpertise() {
-    //TODO
-    return null;
+  /// Get the file which have the gain that will help to produce other molecules fastly
+  File getFileWithTheMoreHelpfulExpertise(Player player) {
+    File helpfulFile;
+    int needExp = -1;
+
+    if (files.isEmpty) {
+      throw Exception('files must not be empty.');
+    }
+
+    if (files.length == 1) {
+      return files.first;
+    }
+
+    // For each carried file F, check how many other files need expertise from F to reduce the production time
+    files.forEach((file) {
+      List<File> _files = [...files];
+
+      _files.retainWhere((f) => f != file);
+
+      // needExp represents the number of files (out of two) which can profit from the expertise of [file]
+      int newNeedExp = _files.where((f) {
+        var moleculeType = file.gain;
+        return f.costs[moleculeType] > max(0, player.expertises[moleculeType]);
+      }).length;
+
+      if (newNeedExp > needExp) {
+        needExp = newNeedExp;
+        helpfulFile = file;
+        debug('***');
+        debug(helpfulFile.id);
+      }
+    });
+
+    return helpfulFile;
   }
 
   /// Return the first file the robot can produce, else return null
@@ -468,10 +501,10 @@ class State {
         else {
           var rank = 1;
           // If expertise is greater or equal than 3 and number of files with rank 2 is less than 2, take a file of rank 2
-          if (Game.player0.isEachExpertiseGreaterOrEqualThan(1)) {
+          if (Game.player0.getTotalExpertise() >= 5) {
             rank = 2;
           }
-          if (Game.player0.isEachExpertiseGreaterOrEqualThan(2)) {
+          if (Game.player0.getTotalExpertise() >= 10) {
             rank = 3;
           }
           Commands.connectSamples(rank);
@@ -495,7 +528,8 @@ class State {
         }
         // Else collect molecules
         else {
-          var file = Game.player0.robot.getFileWithMaxRatio();
+          var file = Game.player0.robot
+              .getFileWithTheMoreHelpfulExpertise(Game.player0);
           var moleculeType =
               Game.player0.robot.whichMoleculeToCollect(file, Game.player0);
           // If we cannot collect molecule, wait
