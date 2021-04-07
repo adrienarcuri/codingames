@@ -152,6 +152,7 @@ class Player {
 
   /// Get the file which have the gain that will help to produce other molecules fastly
   File _getFileWithTheMoreHelpfulExpertise(List<File> files) {
+    File helpfulFile;
     int needExp = -1;
 
     if (files.isEmpty) {
