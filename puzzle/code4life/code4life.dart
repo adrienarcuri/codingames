@@ -93,6 +93,14 @@ class Util {
     throw (Exception(
         'The molecule $s is not a valid molecule type. Should be one of: ${MoleculeType.values.map(Util.toShortString)}'));
   }
+
+  static String displayMap(Map<MoleculeType, int> map) {
+    var map2 = {};
+    map.entries.forEach((entry) {
+      map2[Util.toShortString(entry.key)] = entry.value;
+    });
+    return map2.toString();
+  }
 }
 
 /// PLAYER
@@ -135,11 +143,7 @@ class Player {
     String props = [
       'id: $id',
       'score: $score',
-      'expertiseA:${expertises[MoleculeType.A]}',
-      'expertiseB:${expertises[MoleculeType.B]}',
-      'expertiseC:${expertises[MoleculeType.C]}',
-      'expertiseD:${expertises[MoleculeType.D]}',
-      'expertiseE:${expertises[MoleculeType.E]}',
+      'expertises:${Util.displayMap(expertises)}',
       'robot: $robot'
     ].join(' ');
     s += props;
@@ -164,11 +168,7 @@ class Project {
   String toString() {
     var s = '';
     var props = [
-      'expertiseA:$expertises[MoleculeType.A]',
-      'expertiseB:$expertises[MoleculeType.B]',
-      'expertiseC:$expertises[MoleculeType.C]',
-      'expertiseD:$expertises[MoleculeType.D]',
-      'expertiseE:$expertises[MoleculeType.E]',
+      'expertises:${Util.displayMap(expertises)}',
     ].join(' ');
     s += props;
     return s;
@@ -303,14 +303,10 @@ class Robot {
   String toString() {
     String s = 'ROBOT:';
     String props = [
-      'target:${Util.toShortString(target)} '
-          'eta:$eta '
-          'storageA:${storages[MoleculeType.A]}'
-          'storageB:${storages[MoleculeType.B]}'
-          'storageC:${storages[MoleculeType.C]} '
-          'storageD:${storages[MoleculeType.D]}'
-          'storageE:${storages[MoleculeType.E]}'
-          'files: $files'
+      'target:${Util.toShortString(target)} ',
+      'eta:$eta',
+      'storages: ${Util.displayMap(storages)}',
+      'files: $files',
     ].join(' ');
     s += props;
     return s;
@@ -368,12 +364,8 @@ class File {
       'carriedBy:$carriedBy',
       'health:$health',
       'rank:$rank',
-      'gain:$gain',
-      'costA:${costs[MoleculeType.A]}',
-      'costB:${costs[MoleculeType.B]}',
-      'costC:${costs[MoleculeType.C]}',
-      'costD:${costs[MoleculeType.D]}',
-      'costE:${costs[MoleculeType.E]}',
+      'gain:${Util.toShortString(gain)}',
+      'costs:${Util.displayMap(costs)}',
     ].join(' ');
     s += props;
     return s;
@@ -536,7 +528,7 @@ class State {
 
   @override
   String toString() {
-    var s = 'STATE:\n';
+    var s = 'STATE: ';
     var props = [
       'state:${Util.toShortString(state)}',
       'hasAllSamples:$hasAllSamples',
@@ -601,8 +593,8 @@ class Game {
     String s = 'GAME:' '\n ';
 
     var props = [
-      'availables: A:${availables[MoleculeType.A]} B:${availables[MoleculeType.B]} C:${availables[MoleculeType.C]} D:${availables[MoleculeType.D]} E:${availables[MoleculeType.E]}',
-      'projects: \n[\n  ${projects.join('\n  ')}\n]',
+      'availables: ${Util.displayMap(availables)}',
+      'projects: \n  ${projects.join('\n  ')}',
       'files: \n${files.join('\n')}',
       'player0:$player0',
       'player1:$player1',
@@ -750,7 +742,7 @@ void main() {
     State state = State();
 
     state.evalState();
-    //debug(state);
+    debug(state);
 
     state.actions();
   }
