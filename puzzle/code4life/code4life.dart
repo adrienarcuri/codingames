@@ -1,3 +1,5 @@
+// TODO:
+// [ ] Produce the file which the more helpful expertise to make the 2 other files
 import 'dart:io';
 
 /// ENUMS
@@ -62,7 +64,34 @@ class Util {
     if (s == Util.toShortString(ModuleType.MOLECULES)) {
       return ModuleType.MOLECULES;
     }
-    return ModuleType.SAMPLES;
+    if (s == Util.toShortString(ModuleType.SAMPLES)) {
+      return ModuleType.SAMPLES;
+    }
+    throw (Exception(
+        'The module $s is not a valid module type. Should be one of: ${ModuleType.values.map(Util.toShortString)}'));
+  }
+
+  static MoleculeType toMoleculeType(String s) {
+    if (s == Util.toShortString(MoleculeType.A)) {
+      return MoleculeType.A;
+    }
+    if (s == Util.toShortString(MoleculeType.B)) {
+      return MoleculeType.B;
+    }
+    if (s == Util.toShortString(MoleculeType.C)) {
+      return MoleculeType.C;
+    }
+    if (s == Util.toShortString(MoleculeType.D)) {
+      return MoleculeType.D;
+    }
+    if (s == Util.toShortString(MoleculeType.E)) {
+      return MoleculeType.E;
+    }
+    if (s == '0') {
+      return MoleculeType.A;
+    }
+    throw (Exception(
+        'The molecule $s is not a valid molecule type. Should be one of: ${MoleculeType.values.map(Util.toShortString)}'));
   }
 }
 
@@ -72,11 +101,7 @@ class Player {
     this.id,
     this.score,
     this.robot,
-    this.expertiseA,
-    this.expertiseB,
-    this.expertiseC,
-    this.expertiseD,
-    this.expertiseE,
+    this.expertises,
   });
 
   /// Player id, 0 = me, 1 = ennemy
@@ -85,75 +110,65 @@ class Player {
   /// Score of the player
   int score;
 
-  /// Expertise for each molecule type
-  int expertiseA;
-  int expertiseB;
-  int expertiseC;
-  int expertiseD;
-  int expertiseE;
+  /// Expertise of the player for each molecule type
+  /// Example : expertises[A]=2
+  Map<MoleculeType, int> expertises;
 
   /// Robot of the player
   Robot robot;
 
   /// Return the sum of all expertises
   int getTotalExpertise() {
-    var total = expertiseA + expertiseB + expertiseC + expertiseD + expertiseE;
+    int total = expertises.values.reduce((a, b) => a + b);
 
     return total;
   }
 
   /// Return true if each expertise type is greater than [min]
   bool isEachExpertiseGreaterOrEqualThan(int min) {
-    return [expertiseA, expertiseB, expertiseC, expertiseD, expertiseE]
-        .every((e) => e >= min);
+    return expertises.values.every((e) => e >= min);
   }
 
   @override
   String toString() {
-    return 'PLAYER- '
-        'id: $id '
-        'id: $score '
-        'expertiseA: $expertiseA '
-        'expertiseB: $expertiseB '
-        'expertiseC: $expertiseC '
-        'expertiseD: $expertiseD '
-        'expertiseE: $expertiseE '
-        'robot: $robot ';
+    String s = 'PLAYER:';
+    String props = [
+      'id: $id',
+      'score: $score',
+      'expertiseA:${expertises[MoleculeType.A]}',
+      'expertiseB:${expertises[MoleculeType.B]}',
+      'expertiseC:${expertises[MoleculeType.C]}',
+      'expertiseD:${expertises[MoleculeType.D]}',
+      'expertiseE:${expertises[MoleculeType.E]}',
+      'robot: $robot'
+    ].join(' ');
+    s += props;
+    return s;
   }
 }
 
 /// PROJECT
 class Project {
-  Project(this.expertiseA, this.expertiseB, this.expertiseC, this.expertiseD,
-      this.expertiseE);
+  Project(
+    this.expertises,
+  );
 
   /// Number of scientific projects
   static int count;
 
-  /// Required expertise for A molecule
-  int expertiseA;
-
-  /// Required expertise for B molecule
-  int expertiseB;
-
-  /// Required expertise for C molecule
-  int expertiseC;
-
-  /// Required expertise for D molecule
-  int expertiseD;
-
-  /// Required expertise for E molecule
-  int expertiseE;
+  /// The required expertise for each molecule type
+  /// Example : expertises[A] = 2
+  Map<MoleculeType, int> expertises;
 
   @override
   String toString() {
     var s = '';
     var props = [
-      'expertiseA:$expertiseA',
-      'expertiseB:$expertiseB',
-      'expertiseC:$expertiseC',
-      'expertiseD:$expertiseD',
-      'expertiseE:$expertiseE',
+      'expertiseA:$expertises[MoleculeType.A]',
+      'expertiseB:$expertises[MoleculeType.B]',
+      'expertiseC:$expertises[MoleculeType.C]',
+      'expertiseD:$expertises[MoleculeType.D]',
+      'expertiseE:$expertises[MoleculeType.E]',
     ].join(' ');
     s += props;
     return s;
@@ -169,11 +184,7 @@ class Robot {
     this.target,
     this.eta,
     this.files,
-    this.storageA,
-    this.storageB,
-    this.storageC,
-    this.storageD,
-    this.storageE,
+    this.storages,
   });
 
   /// Module where the robot is
@@ -186,11 +197,7 @@ class Robot {
   List<File> files;
 
   /// Number of molecules carried by the robot
-  int storageA;
-  int storageB;
-  int storageC;
-  int storageD;
-  int storageE;
+  Map<MoleculeType, int> storages;
 
   bool get hasCarriedFile => files.isNotEmpty;
 
@@ -233,6 +240,11 @@ class Robot {
     return files.last;
   }
 
+  File getFileWithTheMoreHelpfulExpertise() {
+    //TODO
+    return null;
+  }
+
   /// Return the first file the robot can produce, else return null
   File canProduceAFile(Player p) {
     for (var f in files) {
@@ -249,64 +261,59 @@ class Robot {
       return false;
     }
 
-    if (f.costA == -1 ||
-        f.costB == -1 ||
-        f.costC == -1 ||
-        f.costD == -1 ||
-        f.costE == -1) {
+    // If the costs are not available (not diagnosed), return false
+    if (f.costs.values.any((v) => v == -1)) {
       return false;
     }
 
-    if (storageA < f.costA - p.expertiseA) {
+    // If there storage there is enough ressources to produce every molecule type
+    final bool canProduce = MoleculeType.values.every((moleculeType) {
+      int storage = storages[moleculeType];
+      int cost = f.costs[moleculeType];
+      int expertise = p.expertises[moleculeType];
+
+      if (storage + expertise >= cost) {
+        return true;
+      }
       return false;
-    }
-    if (storageB < f.costB - p.expertiseB) {
-      return false;
-    }
-    if (storageC < f.costC - p.expertiseC) {
-      return false;
-    }
-    if (storageD < f.costD - p.expertiseD) {
-      return false;
-    }
-    if (storageE < f.costE - p.expertiseE) {
-      return false;
-    }
-    return true;
+    });
+
+    return canProduce;
   }
 
-  /// Return the molecule the robot must collect to complete the file [f]
+  /// Return the molecule the robot must collect to complete the file [f], orElse return null
   MoleculeType whichMoleculeToCollect(File f, Player p) {
-    if ((storageA + p.expertiseA) < f.costA && Game.availableA > 0) {
-      return MoleculeType.A;
+    for (var moleculeType in MoleculeType.values) {
+      int storage = storages[moleculeType];
+      int cost = f.costs[moleculeType];
+      int expertise = p.expertises[moleculeType];
+      int available = Game.availables[moleculeType];
+
+      // If ressources are less than cost and if molecule is available
+      if (storage + expertise < cost && available > 0) {
+        return moleculeType;
+      }
     }
-    if ((storageB + p.expertiseB) < f.costB && Game.availableB > 0) {
-      return MoleculeType.B;
-    }
-    if ((storageC + p.expertiseC) < f.costC && Game.availableC > 0) {
-      return MoleculeType.C;
-    }
-    if ((storageD + p.expertiseD) < f.costD && Game.availableD > 0) {
-      return MoleculeType.D;
-    }
-    if ((storageE + p.expertiseE) < f.costE && Game.availableE > 0) {
-      return MoleculeType.E;
-    }
+
     // If no molecule are available to complete the file, return null
     return null;
   }
 
   @override
   String toString() {
-    return 'ROBOT- '
-        'target: ${Util.toShortString(target)} '
-        'eta: $eta '
-        'storageA: $storageA '
-        'storageB: $storageB '
-        'storageC: $storageC '
-        'storageD: $storageD '
-        'storageE: $storageE '
-        'files: $files';
+    String s = 'ROBOT:';
+    String props = [
+      'target:${Util.toShortString(target)} '
+          'eta:$eta '
+          'storageA:${storages[MoleculeType.A]}'
+          'storageB:${storages[MoleculeType.B]}'
+          'storageC:${storages[MoleculeType.C]} '
+          'storageD:${storages[MoleculeType.D]}'
+          'storageE:${storages[MoleculeType.E]}'
+          'files: $files'
+    ].join(' ');
+    s += props;
+    return s;
   }
 }
 
@@ -318,11 +325,7 @@ class File {
     this.health,
     this.rank,
     this.gain,
-    this.costA,
-    this.costB,
-    this.costC,
-    this.costD,
-    this.costE,
+    this.costs,
   });
 
   /// id of the file
@@ -338,16 +341,13 @@ class File {
   int rank;
 
   /// Expertise gain of the file in A, B, C, D E
-  String gain;
+  MoleculeType gain;
 
-  int costA;
-  int costB;
-  int costC;
-  int costD;
-  int costE;
+  /// The cost to spends in each molecule type for this file
+  Map<MoleculeType, int> costs;
 
   /// Return the total cost in molecule
-  int get totalCost => costA + costB + costC + costD + costE;
+  int get totalCost => costs.values.reduce((a, b) => a + b);
 
   /// Return the ratio of earned health by total cost in molecule
   double get ratio => health / totalCost;
@@ -369,11 +369,11 @@ class File {
       'health:$health',
       'rank:$rank',
       'gain:$gain',
-      'costA:$costA',
-      'costB:$costB',
-      'costC:$costC',
-      'costD:$costD',
-      'costE:$costE',
+      'costA:${costs[MoleculeType.A]}',
+      'costB:${costs[MoleculeType.B]}',
+      'costC:${costs[MoleculeType.C]}',
+      'costD:${costs[MoleculeType.D]}',
+      'costE:${costs[MoleculeType.E]}',
     ].join(' ');
     s += props;
     return s;
@@ -561,11 +561,9 @@ class Game {
   static Player player1;
 
   /// Available molecules for each molecule type
-  static int availableA;
-  static int availableB;
-  static int availableC;
-  static int availableD;
-  static int availableE;
+  ///
+  /// Example: availables[MoleculeType.A] = 2
+  static Map<MoleculeType, int> availables;
 
   /// Get the number of scientific projects
   int get projectCount => projects.length;
@@ -603,7 +601,7 @@ class Game {
     String s = 'GAME:' '\n ';
 
     var props = [
-      'availables: A:$availableA B:$availableB C:$availableC D:$availableD E:$availableE',
+      'availables: A:${availables[MoleculeType.A]} B:${availables[MoleculeType.B]} C:${availables[MoleculeType.C]} D:${availables[MoleculeType.D]} E:${availables[MoleculeType.E]}',
       'projects: \n[\n  ${projects.join('\n  ')}\n]',
       'files: \n${files.join('\n')}',
       'player0:$player0',
@@ -629,7 +627,13 @@ void main() {
     int d = int.parse(inputs[3]);
     int e = int.parse(inputs[4]);
 
-    Game.projects.add(Project(a, b, c, d, e));
+    Game.projects.add(Project({
+      MoleculeType.A: a,
+      MoleculeType.B: b,
+      MoleculeType.C: c,
+      MoleculeType.D: d,
+      MoleculeType.E: e,
+    }));
   }
 
   bool isFirstTurn = true;
@@ -656,22 +660,26 @@ void main() {
       var robot = Robot(
         target: isFirstTurn ? ModuleType.CENTER : Util.toModuleType(target),
         eta: eta,
-        storageA: storageA,
-        storageB: storageB,
-        storageC: storageC,
-        storageD: storageD,
-        storageE: storageE,
+        storages: {
+          MoleculeType.A: storageA,
+          MoleculeType.B: storageB,
+          MoleculeType.C: storageC,
+          MoleculeType.D: storageD,
+          MoleculeType.E: storageE,
+        },
       );
 
       var player = Player(
         id: i,
         robot: robot,
         score: score,
-        expertiseA: expertiseA,
-        expertiseB: expertiseB,
-        expertiseC: expertiseC,
-        expertiseD: expertiseD,
-        expertiseE: expertiseE,
+        expertises: {
+          MoleculeType.A: expertiseA,
+          MoleculeType.B: expertiseB,
+          MoleculeType.C: expertiseC,
+          MoleculeType.D: expertiseD,
+          MoleculeType.E: expertiseE,
+        },
       );
 
       if (i == 0) {
@@ -690,11 +698,13 @@ void main() {
     int availableD = int.parse(inputs[3]);
     int availableE = int.parse(inputs[4]);
 
-    Game.availableA = availableA;
-    Game.availableB = availableB;
-    Game.availableC = availableC;
-    Game.availableD = availableD;
-    Game.availableE = availableE;
+    Game.availables = {
+      MoleculeType.A: availableA,
+      MoleculeType.B: availableB,
+      MoleculeType.C: availableC,
+      MoleculeType.D: availableD,
+      MoleculeType.E: availableE,
+    };
 
     int sampleCount = int.parse(stdin.readLineSync());
 
@@ -714,17 +724,18 @@ void main() {
       int costE = int.parse(inputs[9]);
 
       var file = File(
-        id: sampleId,
-        carriedBy: carriedBy,
-        health: health,
-        gain: expertiseGain,
-        rank: rank,
-        costA: costA,
-        costB: costB,
-        costC: costC,
-        costD: costD,
-        costE: costE,
-      );
+          id: sampleId,
+          carriedBy: carriedBy,
+          health: health,
+          gain: Util.toMoleculeType(expertiseGain),
+          rank: rank,
+          costs: {
+            MoleculeType.A: costA,
+            MoleculeType.B: costB,
+            MoleculeType.C: costC,
+            MoleculeType.D: costD,
+            MoleculeType.E: costE,
+          });
 
       newfiles.add(file);
     }
