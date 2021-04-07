@@ -195,10 +195,19 @@ class Player {
     return robot.getDiagFiles().any(_willBeAbleToCollectAllMoleculesForAFile);
   }
 
+  /// Return true if there is enough robot storage to collect molecule for file [file]
+  bool _hasEnoughStorageToCollectFile(File file) {
+    return robot.availableStorage >= file.totalCost;
+  }
+
   /// Return true if the robot will be able to produce the file [f] in the current context
   /// depending if there is enought molecules  and expertise available. If it is
   /// impossible to produce, return false
   bool _willBeAbleToCollectAllMoleculesForAFile(File f) {
+    if (!_hasEnoughStorageToCollectFile(f)) {
+      return false;
+    }
+
     final able = MoleculeType.values.every((moleculeType) {
       final cost = f.costs[moleculeType];
       final expertise = expertises[moleculeType];
@@ -254,7 +263,7 @@ class Project {
 /// ROBOT
 class Robot {
   static const int maxFiles = 3;
-  static const int maxMolecules = 10;
+  static const int maxStorage = 10;
 
   Robot({
     this.target,
@@ -275,7 +284,9 @@ class Robot {
   /// Number of molecules carried by the robot
   Map<MoleculeType, int> storages;
 
-  bool get hasCarriedFile => files.isNotEmpty;
+  /// Get the number of remaining space to store other molecules
+  int get availableStorage =>
+      maxStorage - max(0, storages.values.reduce((a, b) => a + b));
 
   /// Return true if all files carried by the robot are diagnosed, else return false
   bool get isAllDiagFiles {
@@ -520,9 +531,7 @@ class State {
     // If the robot is moving Moving, the state is MOVING
     if (Game.player0.robot.eta > 0) {
       _state = StateType.MOVING;
-    } else if (!hasAllSamples &&
-        !canProduceAFile &&
-        !canCollectMoleculeForAtLeastOneDiagFile) {
+    } else if (!hasAllSamples && !isAllDiagFiles) {
       _state = StateType.CHOOSE;
     } else if (hasAllSamples && !isAllDiagFiles) {
       _state = StateType.ANALYSE;
@@ -561,7 +570,7 @@ class State {
           }
           if (Game.player0.getTotalExpertise() +
                   Game.player0.robot.files.length >=
-              8) {
+              9) {
             rank = 3;
           }
           Commands.connectSamples(rank);
