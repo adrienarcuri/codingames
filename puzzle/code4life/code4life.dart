@@ -190,6 +190,42 @@ class Player {
     return helpfulFile;
   }
 
+  /// Return the first file the robot can produce, else return null
+  File canProduceAFile() {
+    for (var f in robot.files) {
+      if (_canProduce(f)) {
+        return f;
+      }
+    }
+    return null;
+  }
+
+  /// Return true if the robot has enough molecules to produce the file [f]
+  bool _canProduce(File f) {
+    if (f == null) {
+      return false;
+    }
+
+    // If the costs are not available (not diagnosed), return false
+    if (f.costs.values.any((v) => v == -1)) {
+      return false;
+    }
+
+    // If there storage there is enough ressources to produce every molecule type
+    final bool canProduce = MoleculeType.values.every((moleculeType) {
+      int storage = robot.storages[moleculeType];
+      int cost = f.costs[moleculeType];
+      int expertise = expertises[moleculeType];
+
+      if (storage + expertise >= cost) {
+        return true;
+      }
+      return false;
+    });
+
+    return canProduce;
+  }
+
   /// Return true if the player will be able to collect the needed molecules for all diagnosed files
   bool isEnoughtMoleculesAvailableForAtLeastOneDiagFile() {
     return robot.getDiagFiles().any(_willBeAbleToCollectAllMoleculesForAFile);
@@ -197,13 +233,25 @@ class Player {
 
   /// Return true if there is enough robot storage to collect molecule for file [file]
   bool _hasEnoughStorageToCollectFile(File file) {
-    return robot.availableStorage >= file.totalCost;
+    int deduceCost = MoleculeType.values
+        .map((moleculeType) =>
+            file.costs[moleculeType] -
+            expertises[moleculeType] -
+            robot.storages[moleculeType])
+        .reduce((a, b) => a + b);
+    debug(file.totalCost);
+    debug(deduceCost);
+    return robot.availableStorage >= deduceCost;
   }
 
   /// Return true if the robot will be able to produce the file [f] in the current context
   /// depending if there is enought molecules  and expertise available. If it is
   /// impossible to produce, return false
   bool _willBeAbleToCollectAllMoleculesForAFile(File f) {
+    if (canProduceAFile() != null) {
+      return false;
+    }
+
     if (!_hasEnoughStorageToCollectFile(f)) {
       return false;
     }
@@ -325,42 +373,6 @@ class Robot {
     }
     _sortFilesByRatio();
     return files.last;
-  }
-
-  /// Return the first file the robot can produce, else return null
-  File canProduceAFile(Player p) {
-    for (var f in files) {
-      if (_canProduce(f, p)) {
-        return f;
-      }
-    }
-    return null;
-  }
-
-  /// Return true if the robot has enough molecules to produce the file [f]
-  bool _canProduce(File f, Player p) {
-    if (f == null) {
-      return false;
-    }
-
-    // If the costs are not available (not diagnosed), return false
-    if (f.costs.values.any((v) => v == -1)) {
-      return false;
-    }
-
-    // If there storage there is enough ressources to produce every molecule type
-    final bool canProduce = MoleculeType.values.every((moleculeType) {
-      int storage = storages[moleculeType];
-      int cost = f.costs[moleculeType];
-      int expertise = p.expertises[moleculeType];
-
-      if (storage + expertise >= cost) {
-        return true;
-      }
-      return false;
-    });
-
-    return canProduce;
   }
 
   /// Return the molecule the robot must collect to complete the file [f], orElse return null
@@ -520,7 +532,7 @@ class State {
     if (Game.player0.robot.isAllDiagFiles) {
       isAllDiagFiles = true;
     }
-    if (Game.player0.robot.canProduceAFile(Game.player0) != null) {
+    if (Game.player0.canProduceAFile() != null) {
       canProduceAFile = true;
     }
     if (Game.player0.isEnoughtMoleculesAvailableForAtLeastOneDiagFile()) {
@@ -535,9 +547,7 @@ class State {
       _state = StateType.CHOOSE;
     } else if (hasAllSamples && !isAllDiagFiles) {
       _state = StateType.ANALYSE;
-    } else if (isAllDiagFiles &&
-        canCollectMoleculeForAtLeastOneDiagFile &&
-        !canProduceAFile) {
+    } else if (isAllDiagFiles && canCollectMoleculeForAtLeastOneDiagFile) {
       _state = StateType.COLLECT;
     } else if (isAllDiagFiles && canProduceAFile) {
       _state = StateType.PRODUCE;
@@ -568,9 +578,10 @@ class State {
               5) {
             rank = 2;
           }
-          if (Game.player0.getTotalExpertise() +
-                  Game.player0.robot.files.length >=
-              9) {
+          if ((Game.player0.getTotalExpertise() +
+                      Game.player0.robot.files.length >=
+                  9) &&
+              (Game.player0.robot.getRankCount(3) < 2)) {
             rank = 3;
           }
           Commands.connectSamples(rank);
@@ -612,7 +623,7 @@ class State {
         }
         // Else produce
         else {
-          File file = Game.player0.robot.canProduceAFile(Game.player0);
+          File file = Game.player0.canProduceAFile();
 
           Commands.connectLaboratory(file.id.toString());
         }
