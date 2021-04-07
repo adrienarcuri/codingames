@@ -1,5 +1,3 @@
-// TODO:
-// [ ] Produce the file which the more helpful expertise to make the 2 other files
 import 'dart:io';
 
 import 'dart:math';
@@ -139,6 +137,75 @@ class Player {
     return expertises.values.every((e) => e >= min);
   }
 
+  /// Choose a file by which we will collect molecules for
+  File chooseAfileToCollect() {
+    var _files = [...robot.files];
+    _files.retainWhere(_willBeAbleToCollectAllMoleculesForAFile);
+
+    if (_files.isEmpty) {
+      return null;
+    }
+
+    final file = _getFileWithTheMoreHelpfulExpertise(_files);
+    return file;
+  }
+
+  /// Get the file which have the gain that will help to produce other molecules fastly
+  File _getFileWithTheMoreHelpfulExpertise(List<File> files) {
+    int needExp = -1;
+
+    if (files.isEmpty) {
+      throw Exception('files must not be empty.');
+    }
+
+    if (files.length == 1) {
+      return files.first;
+    }
+
+    // For each carried file F, check how many other files need expertise from F to reduce the production time
+    files.forEach((file) {
+      List<File> _files = [...files];
+
+      _files.retainWhere((f) => f != file);
+
+      // needExp represents the number of files (out of two) which can profit from the expertise of [file]
+      int newNeedExp = _files.where((f) {
+        var moleculeType = file.gain;
+        return f.costs[moleculeType] > max(0, expertises[moleculeType]);
+      }).length;
+
+      if (newNeedExp > needExp) {
+        needExp = newNeedExp;
+        helpfulFile = file;
+      }
+    });
+
+    return helpfulFile;
+  }
+
+  /// Return true if the player will be able to collect the needed molecules for all diagnosed files
+  bool isEnoughtMoleculesAvailableForAtLeastOneDiagFile() {
+    return robot.getDiagFiles().any(_willBeAbleToCollectAllMoleculesForAFile);
+  }
+
+  /// Return true if the robot will be able to produce the file [f] in the current context
+  /// depending if there is enought molecules  and expertise available. If it is
+  /// impossible to produce, return false
+  bool _willBeAbleToCollectAllMoleculesForAFile(File f) {
+    final able = MoleculeType.values.every((moleculeType) {
+      final cost = f.costs[moleculeType];
+      final expertise = expertises[moleculeType];
+      final available = Game.availables[moleculeType];
+      final storage = robot.storages[moleculeType];
+      // If the cost in molecules of the file is higher than the available molecules and the molecule expertise of the player
+      if (available + expertise + storage >= cost) {
+        return true;
+      }
+      return false;
+    });
+    return able;
+  }
+
   @override
   String toString() {
     String s = 'PLAYER:';
@@ -240,42 +307,6 @@ class Robot {
     }
     _sortFilesByRatio();
     return files.last;
-  }
-
-  /// Get the file which have the gain that will help to produce other molecules fastly
-  File getFileWithTheMoreHelpfulExpertise(Player player) {
-    File helpfulFile;
-    int needExp = -1;
-
-    if (files.isEmpty) {
-      throw Exception('files must not be empty.');
-    }
-
-    if (files.length == 1) {
-      return files.first;
-    }
-
-    // For each carried file F, check how many other files need expertise from F to reduce the production time
-    files.forEach((file) {
-      List<File> _files = [...files];
-
-      _files.retainWhere((f) => f != file);
-
-      // needExp represents the number of files (out of two) which can profit from the expertise of [file]
-      int newNeedExp = _files.where((f) {
-        var moleculeType = file.gain;
-        return f.costs[moleculeType] > max(0, player.expertises[moleculeType]);
-      }).length;
-
-      if (newNeedExp > needExp) {
-        needExp = newNeedExp;
-        helpfulFile = file;
-        debug('***');
-        debug(helpfulFile.id);
-      }
-    });
-
-    return helpfulFile;
   }
 
   /// Return the first file the robot can produce, else return null
@@ -409,13 +440,17 @@ class File {
 class Commands {
   ///  Make the robot do nothing (or keep the robot moving)
   static void wait() {
-    print('WAIT');
+    print('WAIT ' * 2);
+  }
+
+  static void move() {
+    print('MOVE');
   }
 
   ///  Make the robot go the specific module [moduleType]
   static void goTo(ModuleType moduleType) {
     String moduleName = Util.toShortString(moduleType);
-    print('GOTO $moduleName');
+    print('GOTO $moduleName ' * 2);
   }
 
   /// Make the robot get a sample file of a specific [rank]
@@ -444,7 +479,7 @@ class Commands {
   }
 
   static void _connect(String e) {
-    print('CONNECT $e');
+    print('CONNECT $e ' * 2);
   }
 }
 
@@ -454,6 +489,7 @@ class State {
   bool hasAllSamples = false;
   bool isAllDiagFiles = false;
   bool canProduceAFile = false;
+  bool canCollectMoleculeForAtLeastOneDiagFile = false;
 
   StateType get state => _state;
 
@@ -468,16 +504,23 @@ class State {
     if (Game.player0.robot.canProduceAFile(Game.player0) != null) {
       canProduceAFile = true;
     }
+    if (Game.player0.isEnoughtMoleculesAvailableForAtLeastOneDiagFile()) {
+      canCollectMoleculeForAtLeastOneDiagFile = true;
+    }
 
     // EVAL STATE
     // If the robot is moving Moving, the state is MOVING
     if (Game.player0.robot.eta > 0) {
       _state = StateType.MOVING;
-    } else if (!hasAllSamples && !isAllDiagFiles && !canProduceAFile) {
+    } else if (!hasAllSamples &&
+        !canProduceAFile &&
+        !canCollectMoleculeForAtLeastOneDiagFile) {
       _state = StateType.CHOOSE;
     } else if (hasAllSamples && !isAllDiagFiles) {
       _state = StateType.ANALYSE;
-    } else if (isAllDiagFiles && !canProduceAFile) {
+    } else if (isAllDiagFiles &&
+        canCollectMoleculeForAtLeastOneDiagFile &&
+        !canProduceAFile) {
       _state = StateType.COLLECT;
     } else if (isAllDiagFiles && canProduceAFile) {
       _state = StateType.PRODUCE;
@@ -489,7 +532,7 @@ class State {
   actions() {
     switch (_state) {
       case StateType.MOVING:
-        Commands.wait();
+        Commands.move();
 
         break;
       case StateType.CHOOSE:
@@ -501,10 +544,10 @@ class State {
         else {
           var rank = 1;
           // If expertise is greater or equal than 3 and number of files with rank 2 is less than 2, take a file of rank 2
-          if (Game.player0.getTotalExpertise() >= 5) {
+          if (Game.player0.getTotalExpertise() >= 6) {
             rank = 2;
           }
-          if (Game.player0.getTotalExpertise() >= 10) {
+          if (Game.player0.getTotalExpertise() >= 9) {
             rank = 3;
           }
           Commands.connectSamples(rank);
@@ -528,8 +571,7 @@ class State {
         }
         // Else collect molecules
         else {
-          var file = Game.player0.robot
-              .getFileWithTheMoreHelpfulExpertise(Game.player0);
+          var file = Game.player0.chooseAfileToCollect();
           var moleculeType =
               Game.player0.robot.whichMoleculeToCollect(file, Game.player0);
           // If we cannot collect molecule, wait
@@ -772,7 +814,7 @@ void main() {
      * GAME LOGIC
      */
 
-    Game.show();
+    //Game.show();
     State state = State();
 
     state.evalState();
