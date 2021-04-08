@@ -1,6 +1,5 @@
-/// TODO
-// [ ] Better allocate SAMPLES rank
-// [ ] Store files in the cloud if we cannot produce it
+import 'dart:collection';
+
 import 'dart:io';
 
 import 'dart:math';
@@ -138,6 +137,185 @@ class Player {
     return total;
   }
 
+  /// Return the molecule the robot must collect to complete the file [f], orElse return null
+  MoleculeType whichMoleculeToCollect(File f) {
+    for (var moleculeType in MoleculeType.values) {
+      int storage = robot.storages[moleculeType];
+      int cost = f.costs[moleculeType];
+      int expertise = expertises[moleculeType];
+      int available = Game.availables[moleculeType];
+
+      // If ressources are less than cost and if molecule is available
+      if (storage + expertise < cost && available > 0) {
+        return moleculeType;
+      }
+    }
+
+    // If no molecule are available to complete the file, return null
+    return null;
+  }
+
+  List<Object> shouldCollectOrProduceOrStore() {
+    List<File> filesToProduce = [];
+    MoleculeType moleculeToCollect;
+
+    var files = filesToCollect();
+    var player = this.copyWith();
+
+    for (var i = 0; i < files.length; i++) {
+      moleculeToCollect = null;
+      var resp = player.canCollectOrProduce(files[i]);
+      debug('***');
+      debug(resp);
+      // The file can be produced now
+      if (resp['can'] == true) {
+        filesToProduce.add(files[i]);
+        //TODO: delete
+        // Simule the production of the file
+        //MoleculeType.values.forEach((mt) {
+        //  player.robot.storages[mt] -= files[i].costs[mt];
+        //});
+        player.expertises[files[i].gain] += 1;
+
+        continue;
+      }
+      // The file cannot be produced now
+      else {
+        if (resp['moleculeType'] != null) {
+          moleculeToCollect = resp['moleculeType'];
+        }
+        break;
+      }
+    }
+
+    if (moleculeToCollect != null) {
+      return ['COLLECT', moleculeToCollect];
+    } else if (filesToProduce.isNotEmpty) {
+      return ['PRODUCE', filesToProduce.first];
+    } else if (files.isNotEmpty) {
+      return ['STORE'];
+    } else {
+      return ['WAIT'];
+    }
+  }
+
+  /// Return a map to know if the player can collect molecule of [file]
+  ///
+  /// If can produce the file, return
+  ///
+  /// resp = {'can': true};
+  ///
+  /// If cannot produce the file, but should collect a molecule to produce
+  /// first, return
+  ///
+  /// resp = {'can': false, 'moleculeType': moleculeType.X};
+  ///
+  /// If cannot produce this file because it is impossible in the current context
+  /// return
+  ///
+  /// resp = {'can': false, 'moleculeType': null}
+  Map<String, dynamic> canCollectOrProduce(File file) {
+    Map<String, dynamic> resp = {};
+
+    /// Is there enought molecules in the robot storage ?
+    bool _haveEnoughStorage(File file) {
+      return MoleculeType.values.every((moleculeType) {
+        int storage = robot.storages[moleculeType];
+        int cost = file.costs[moleculeType];
+        int expertise = expertises[moleculeType];
+        // If the storage is greater or equal thant the cost less the expertise, we have enough storage
+        if (storage >= cost - expertise) {
+          return true;
+        } else {
+          return false;
+        }
+      });
+    }
+
+    /// Return are the missing molecules in the storage to produce File [file].
+    /// The result is a map where the key are the [MoleculeType] and the values are the missing molecules
+    /// If the result is > 0, the molecule is missing
+    /// If the result is == 0, there is just enough molecule
+    /// If the result is < 0, there is more storage or expertise than needed
+    Map<MoleculeType, int> _missingMolecules(File file) {
+      Map<MoleculeType, int> map = {};
+      MoleculeType.values.forEach((moleculeType) {
+        int storage = robot.storages[moleculeType];
+        int cost = file.costs[moleculeType] = file.costs[moleculeType];
+        int expertise = expertises[moleculeType];
+
+        int missing = cost - storage - expertise;
+        if (missing > 0) {
+          map[moleculeType] = missing;
+        }
+        ;
+      });
+      return map;
+    }
+
+    /// Return true if the amount of [quantity] of [moleculeType] is available in the game
+    bool _isMoleculeAvailable(MoleculeType moleculeType, int quantity) {
+      return Game.availables[moleculeType] >= quantity;
+    }
+
+    ///Return true if there is enough available quantity for each [MoleculeType] in [quantities] in the game
+    bool _isMoleculesAvailables(Map<MoleculeType, int> quantities) {
+      return quantities.keys.every((moleculeType) =>
+          _isMoleculeAvailable(moleculeType, quantities[moleculeType]));
+    }
+
+    // Return the MoleculeType which we should collect first because it will become empty soon (avaibility - need  are is to 0);
+    MoleculeType _whichMoleculeToCollectFirst(
+        File file, Map<MoleculeType, int> quantities) {
+      Map<MoleculeType, int> rest = {};
+      quantities.keys.forEach((mt) {
+        rest[mt] = Game.availables[mt] - quantities[mt];
+      });
+
+      debug('*** rest:$rest');
+
+      // Sort the  rest map by ascending value : The molecule with the minimum rest are rare
+      var restSortedKeys = rest.keys.toList(growable: false)
+        ..sort((k1, k2) => rest[k1].compareTo(rest[k2]));
+      LinkedHashMap RestSortedMap = new LinkedHashMap.fromIterable(
+          restSortedKeys,
+          key: (k) => k,
+          value: (k) => rest[k]);
+      debug('*** restSortedByValue:$RestSortedMap');
+
+      return RestSortedMap.keys.first;
+    }
+
+    // If we don't have enough molecules in storage,
+    if (!_haveEnoughStorage(file)) {
+      debug('*** file.costs:${file.costs}');
+
+      Map<MoleculeType, int> missingQuantities = _missingMolecules(file);
+      debug('*** missingQuantities:$missingQuantities');
+
+      if (missingQuantities.values.reduce((a, b) => a + b) >
+          this.robot.availableStorage) {
+        resp = {'can': false, 'moleculeType': null};
+        return resp;
+      }
+
+      // But, if all molecules are availables in the game,
+      if (_isMoleculesAvailables(missingQuantities)) {
+        // Tell us which molecule we should collect first
+        final moleculeToCollect =
+            _whichMoleculeToCollectFirst(file, missingQuantities);
+        resp = {'can': false, 'moleculeType': moleculeToCollect};
+      } else {
+        resp = {'can': false, 'moleculeType': null};
+      }
+    }
+    // We have enough molecules in storage to make the file
+    else {
+      resp = {'can': true};
+    }
+    return resp;
+  }
+
   /// Return true if each expertise type is greater than [min]
   bool isEachExpertiseGreaterOrEqualThan(int min) {
     return expertises.values.every((e) => e >= min);
@@ -154,6 +332,22 @@ class Player {
 
     final file = _getFileWithTheMoreHelpfulExpertise(_files);
     return file;
+  }
+
+  /// Return the  ordered list of  carried dianosed files the robot should collect molecules for
+  List<File> filesToCollect() {
+    List<File> orderedFiles = [];
+    List<File> files = [...robot.files];
+
+    files.retainWhere(_willBeAbleToCollectAllMoleculesForAFile);
+
+    while (files.isNotEmpty) {
+      var file = _getFileWithTheMoreHelpfulExpertise(files);
+      orderedFiles.add(file);
+      files.remove(file);
+    }
+
+    return orderedFiles;
   }
 
   /// Get the file which have the gain that will help to produce other molecules fastly
@@ -211,7 +405,7 @@ class Player {
       return false;
     }
 
-    // If there storage there is enough ressources to produce every molecule type
+    // If there is enough ressources to produce every molecule type
     final bool canProduce = MoleculeType.values.every((moleculeType) {
       int storage = robot.storages[moleculeType];
       int cost = f.costs[moleculeType];
@@ -239,8 +433,6 @@ class Player {
             expertises[moleculeType] -
             robot.storages[moleculeType])
         .reduce((a, b) => a + b);
-    debug(file.totalCost);
-    debug(deduceCost);
     return robot.availableStorage >= deduceCost;
   }
 
@@ -248,10 +440,6 @@ class Player {
   /// depending if there is enought molecules  and expertise available. If it is
   /// impossible to produce, return false
   bool _willBeAbleToCollectAllMoleculesForAFile(File f) {
-    if (canProduceAFile() != null) {
-      return false;
-    }
-
     if (!_hasEnoughStorageToCollectFile(f)) {
       return false;
     }
@@ -282,6 +470,20 @@ class Player {
     s += props;
     return s;
   }
+
+  Player copyWith({
+    int id,
+    int score,
+    Robot robot,
+    Map<MoleculeType, int> expertises,
+  }) =>
+      Player(
+        id: id ?? this.id,
+        score: score ?? this.score,
+        robot: robot ?? this.robot.copyWith(),
+        expertises: expertises ?? {}
+          ..addAll(this.expertises),
+      );
 }
 
 /// PROJECT
@@ -375,24 +577,6 @@ class Robot {
     return files.last;
   }
 
-  /// Return the molecule the robot must collect to complete the file [f], orElse return null
-  MoleculeType whichMoleculeToCollect(File f, Player p) {
-    for (var moleculeType in MoleculeType.values) {
-      int storage = storages[moleculeType];
-      int cost = f.costs[moleculeType];
-      int expertise = p.expertises[moleculeType];
-      int available = Game.availables[moleculeType];
-
-      // If ressources are less than cost and if molecule is available
-      if (storage + expertise < cost && available > 0) {
-        return moleculeType;
-      }
-    }
-
-    // If no molecule are available to complete the file, return null
-    return null;
-  }
-
   @override
   String toString() {
     String s = 'ROBOT:';
@@ -405,6 +589,19 @@ class Robot {
     s += props;
     return s;
   }
+
+  Robot copyWith({
+    ModuleType target,
+    int eta,
+    List<File> files,
+    Map<MoleculeType, int> storages,
+  }) =>
+      Robot(
+          target: target ?? this.target,
+          eta: eta ?? this.eta,
+          files: files ?? this.files.map((f) => f.copyWith()).toList(),
+          storages: storages ?? {}
+            ..addAll(this.storages));
 }
 
 // FILE
@@ -464,6 +661,24 @@ class File {
     s += props;
     return s;
   }
+
+  File copyWith({
+    int carried,
+    Map<MoleculeType, int> costs,
+    MoleculeType gain,
+    int health,
+    int id,
+    int rank,
+  }) =>
+      File(
+        carriedBy: carriedBy ?? this.carriedBy,
+        costs: costs ?? {}
+          ..addAll(this.costs),
+        gain: gain ?? this.gain,
+        health: health ?? this.health,
+        id: id ?? this.id,
+        rank: rank ?? this.rank,
+      );
 }
 
 /// COMMANDS
@@ -521,6 +736,8 @@ class State {
   bool isAllDiagFiles = false;
   bool canProduceAFile = false;
   bool canCollectMoleculeForAtLeastOneDiagFile = false;
+  bool shouldCollect = false;
+  MoleculeType moleculeToCollect;
 
   StateType get state => _state;
 
@@ -539,6 +756,12 @@ class State {
       canCollectMoleculeForAtLeastOneDiagFile = true;
     }
 
+    List<Object> decision = Game.player0.shouldCollectOrProduceOrStore();
+    if (decision[0] == 'COLLECT') {
+      shouldCollect = true;
+      moleculeToCollect = decision[1];
+    }
+
     // EVAL STATE
     // If the robot is moving Moving, the state is MOVING
     if (Game.player0.robot.eta > 0) {
@@ -547,9 +770,11 @@ class State {
       _state = StateType.CHOOSE;
     } else if (hasAllSamples && !isAllDiagFiles) {
       _state = StateType.ANALYSE;
-    } else if (isAllDiagFiles && canCollectMoleculeForAtLeastOneDiagFile) {
+    } else if (isAllDiagFiles &&
+        canCollectMoleculeForAtLeastOneDiagFile &&
+        shouldCollect) {
       _state = StateType.COLLECT;
-    } else if (isAllDiagFiles && canProduceAFile) {
+    } else if (isAllDiagFiles && canProduceAFile && !shouldCollect) {
       _state = StateType.PRODUCE;
     } else if (!canCollectMoleculeForAtLeastOneDiagFile) {
       _state = StateType.STORE;
@@ -605,14 +830,11 @@ class State {
         }
         // Else collect molecules
         else {
-          var file = Game.player0.chooseAfileToCollect();
-          var moleculeType =
-              Game.player0.robot.whichMoleculeToCollect(file, Game.player0);
           // If we cannot collect molecule, wait
-          if (moleculeType == null) {
+          if (moleculeToCollect == null) {
             Commands.wait();
           } else {
-            Commands.connectMolecules(moleculeType);
+            Commands.connectMolecules(moleculeToCollect);
           }
         }
         break;
