@@ -4,6 +4,12 @@ import 'dart:io';
 import 'dart:math';
 
 /// ENUMS
+/// Miniman and maximal total costs in molecules for each rank of a file
+const ranksCosts = {
+  1: [3, 5],
+  2: [5, 8],
+  3: [7, 14],
+};
 enum MoleculeType { A, B, C, D, E }
 enum ModuleType { DIAGNOSIS, MOLECULES, LABORATORY, SAMPLES, CENTER }
 
@@ -188,6 +194,72 @@ class Player {
     return files.first;
   }
 
+  /// Return the rank between 1, 2 or 3 of the file the player must create
+  int create() {
+    /// Compute the probability the player has to produce a file with rank [r]
+    double _prob(int rank) {
+      const ntot = 1000;
+
+      /// Generate a random Costs
+      Map<MoleculeType, int> _randomCosts() {
+        Map<MoleculeType, int> fileCosts = {
+          MoleculeType.A: 0,
+          MoleculeType.B: 0,
+          MoleculeType.C: 0,
+          MoleculeType.D: 0,
+          MoleculeType.E: 0,
+        };
+
+        var min = ranksCosts[rank][0];
+        var max = ranksCosts[rank][1];
+        var totalMol = min + Random().nextInt(max - min);
+
+        for (var i = 0; i < totalMol; i++) {
+          var mol = MoleculeType.values[Random().nextInt(5)];
+          fileCosts[mol]++;
+        }
+        return fileCosts;
+      }
+
+      bool _isFeasible(Map<MoleculeType, int> costs) {
+        bool b =
+            MoleculeType.values.every((mt) => 3 + expertises[mt] >= costs[mt]);
+        return b;
+      }
+
+      var listOfFileCosts = List<Map<MoleculeType, int>>.generate(
+          ntot, (int index) => _randomCosts());
+
+      //debug(listOfFileCosts);
+      // Compute how many files are feasibles
+      var n = listOfFileCosts
+          .map(_isFeasible)
+          .fold(0, (p, n) => p + (n == true ? 1 : 0));
+
+      debug('n:$n');
+
+      double prob = n / ntot;
+      debug('*** prob:$prob');
+      return prob;
+    }
+
+    var rank = 1;
+
+    // If expertise is greater or equal than 3 and number of files with rank 2 is less than 2, take a file of rank 2
+    if (_prob(2) > 0.96) {
+      rank = 2;
+    }
+    if (_prob(3) > 0.96) {
+      rank = 3;
+    }
+    return rank;
+  }
+
+  /// Return the [File] the player must store in the CLOUD
+  File store() {
+    return _uncollectablesFiles()?.first;
+  }
+
   /// Return true if the player can collect all the necessary molecules for at
   /// least one [file] the player's robot is carrying regarding the current
   /// player's [expertises], and player's [robot.storages], else return false
@@ -208,6 +280,14 @@ class Player {
     var b = MoleculeType.values
         .every((mt) => robot.storages[mt] + expertises[mt] >= file.costs[mt]);
     return b;
+  }
+
+  /// Return the list of uncollectables files in the current context
+  List<File> _uncollectablesFiles() {
+    var files = [...?robot.files];
+    files.retainWhere((file) => !file.isCollectable(this));
+    debug('Files to store:${files.map((f) => f.id.toString()).toList()}');
+    return files;
   }
 
   /// Return true if the player can collect all the necessary molecules in the
@@ -706,17 +786,7 @@ class State {
         }
         // Else choose a file
         else {
-          var rank = 1;
-          // If expertise is greater or equal than 3 and number of files with rank 2 is less than 2, take a file of rank 2
-          if (Game.player0.totalExpertises + Game.player0.robot.files.length >=
-              5) {
-            rank = 2;
-          }
-          if ((Game.player0.totalExpertises + Game.player0.robot.files.length >=
-                  9) &&
-              (Game.player0.robot.getRankCount(3) < 2)) {
-            rank = 3;
-          }
+          final rank = p0.create();
           Commands.connectSamples(rank);
         }
         break;
@@ -766,7 +836,7 @@ class State {
         }
         // Else choose a file to store in the cloud
         else {
-          var fileToStore = Game.player0.robot.files.first;
+          var fileToStore = Game.player0.store();
           Commands.connectDiagnosis(fileToStore.id.toString());
         }
         break;
