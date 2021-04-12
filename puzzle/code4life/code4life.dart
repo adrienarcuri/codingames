@@ -178,9 +178,13 @@ class Player {
   File tryProduce() {
     final files = _filesToProduce();
 
+    debug('Files to produces : ${files.map((f) => f.id).toList()}');
+
     if (files.isEmpty) {
       return null;
     }
+    debug('Product File ID ${files.first.id}');
+
     return files.first;
   }
 
@@ -283,6 +287,9 @@ class Player {
       files.remove(file);
     }
 
+    debug(
+        'Files order : ${orderedFiles.map((f) => f.id.toString()).toList().join('->')}');
+
     return orderedFiles;
   }
 
@@ -302,13 +309,8 @@ class Player {
   List<File> _filesToProduce() {
     List<File> orderedFiles = [];
     List<File> files = [...robot.files];
-
     files.retainWhere((f) => f.isProduceable(this));
-
     orderedFiles = _sortFiles(files, _getFileWithTheMoreHelpfulExpertise);
-
-    debug('*** _filesToProduce');
-    debug(files);
 
     return orderedFiles;
   }
@@ -674,9 +676,10 @@ class State {
     else if (p0.robot.hasMaxFiles && !p0.robot.isAllDiagFiles) {
       _state = StateType.DIAGNOSE;
     } // If (all Robot's files are diagnosed) AND (is impossible to produce all files)
-    //If (Robot'storage is full) OR (Robot can produce all files)
+    //If (Robot'storage is full) OR (Robot can produce file(s)) OR (robot is at LABORATORY and can produce files)
     else if (p0.robot.isStorageFull ||
-        (p0.tryCollect() == null && p0.tryProduce() != null)) {
+        (p0.tryCollect() == null && p0.tryProduce() != null) ||
+        (p0.robot.target == ModuleType.LABORATORY && p0.tryProduce() != null)) {
       _state = StateType.PRODUCE;
     } // If (Robot'files are all diagnosed AND (Robot's storage is not full))
     else if (p0.robot.isAllDiagFiles &&
@@ -797,6 +800,12 @@ class Game {
   /// The players
   static Player player0;
   static Player player1;
+
+  /// Current turn of the Game
+  static int turn = 0;
+
+  /// Maximum number of turns of the Game
+  static const maxTurns = 200;
 
   /// Available molecules for each molecule type
   ///
@@ -979,6 +988,7 @@ void main() {
     }
 
     Game.updateFiles(newfiles);
+    Game.turn++;
 
     /**
      * GAME LOGIC
