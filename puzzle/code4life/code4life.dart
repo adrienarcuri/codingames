@@ -10,7 +10,7 @@ const ranksCosts = {
   2: [5, 8],
   3: [7, 14],
 };
-const ntot = 1000;
+const ntot = 200;
 
 final listOfFileCostsR2 = List<Map<MoleculeType, int>>.generate(
     ntot, (int index) => Util._randomCosts2(2));
@@ -34,6 +34,7 @@ enum ModuleType { DIAGNOSIS, MOLECULES, LABORATORY, SAMPLES, CENTER }
 ///
 /// STORE: the robot is storing files on the cloud (because he cannot handle them)
 enum StateType {
+  RESERVE,
   MOVING,
   CREATE,
   DIAGNOSE,
@@ -212,6 +213,8 @@ class Player {
   /// Robot of the player
   Robot robot;
 
+  final int _reserve = 1;
+
   MoleculeType _moleculeToCollectCache;
 
   /// Return the sum of all expertises
@@ -221,6 +224,10 @@ class Player {
 
   /// Return the [MoleculeType] the player must collect for the current turn
   MoleculeType tryCollect() {
+    if (robot.availableStorage == 0) {
+      return null;
+    }
+
     if (_moleculeToCollectCache != null) {
       return _moleculeToCollectCache;
     }
@@ -272,13 +279,34 @@ class Player {
     return files.first;
   }
 
+  /// Return true if robot's storage has at least one molecule of each type in
+  /// its storage
+  bool _hasReserve() {
+    return robot.storages.values.every((storage) => storage >= _reserve);
+  }
+
+  MoleculeType tryMakeReserve() {
+    if (_hasReserve()) {
+      return null;
+    }
+    var moleleculeTypes =
+        robot.storages.keys.where((k) => robot.storages[k] < _reserve);
+
+    for (var mt in moleleculeTypes) {
+      if (Game.availables[mt] > 0) {
+        return mt;
+      }
+    }
+    return null;
+  }
+
   /// Return the rank between 1, 2 or 3 of the file the player must create
   int create() {
     /// Compute the probability the player has to produce a file with rank [r]
     double _prob(int rank) {
       bool _isFeasible(Map<MoleculeType, int> costs) {
         bool b1 = MoleculeType.values.every(
-            (mt) => 5 + expertises[mt] + robot.storages[mt] >= costs[mt]);
+            (mt) => 3 + expertises[mt] + robot.storages[mt] >= costs[mt]);
         var totalRealCost = MoleculeType.values
             .map((mt) => (costs[mt] - expertises[mt] - robot.storages[mt]))
             .reduce((a, b) => a + b);
@@ -312,14 +340,14 @@ class Player {
     final rankCount3 = robot.getRankCount(3);
 
     // If expertise is greater or equal than 3 and number of files with rank 2 is less than 2, take a file of rank 2
-    if ((prob2 >= 0.85 && rankCount2 == 0) ||
-        (prob2 >= 0.9 && rankCount2 == 1) ||
-        (prob2 >= 0.95)) {
+    if ((prob2 >= 0.70 && rankCount2 == 0) ||
+        (prob2 >= 0.80 && rankCount2 == 1) ||
+        (prob2 >= 0.90)) {
       rank = 2;
     }
-    if ((prob3 >= 0.75 && rankCount3 == 0) ||
+    if ((prob3 >= 0.70 && rankCount3 == 0) ||
         (prob3 >= 0.80 && rankCount3 == 1) ||
-        (prob3 >= 0.95)) {
+        (prob3 >= 0.90)) {
       rank = 3;
     }
     return rank;
@@ -813,7 +841,11 @@ class State {
 
   final p0 = Game.player0;
 
+  MoleculeType molToReserve;
+
   evalState() {
+    molToReserve = p0.tryMakeReserve();
+
     // EVAL STATE
     // If the robot is moving Moving, the state is MOVING
     if (p0.robot.eta > 0) {
@@ -825,10 +857,15 @@ class State {
     //         p0.score < 2)) {
     //   _state = StateType.CREATE;
     // } else if (p0.robot.files.length == 2 &&
-    //     !p0.robot.isAllDiagFiles &&
+    //     !p0.robot.isAllDiagFilesisAllDiagFiles &&
     //     p0.score < 2) {
     //   _state = StateType.DIAGNOSE;
     // }
+    else if (p0.robot.availableStorage > 0 &&
+        p0.robot.target == ModuleType.MOLECULES &&
+        p0.tryCollect() == null) {
+      _state = StateType.RESERVE;
+    }
     // If (Robot does not have files) OR (Robot does not have all diagnosed file AND Robot does not have max files)
     else if (p0.robot.files.isEmpty ||
         (!p0.robot.isAllDiagFiles && !p0.robot.hasMaxFiles)) {
@@ -838,8 +875,7 @@ class State {
       _state = StateType.DIAGNOSE;
     } // If (all Robot's files are diagnosed) AND (is impossible to produce all files)
     //If (Robot'storage is full) OR (Robot can produce file(s)) OR (robot is at LABORATORY and can produce files)
-    else if (p0.robot.isStorageFull ||
-        (p0.tryCollect() == null && p0.tryProduce() != null) ||
+    else if ((p0.tryCollect() == null && p0.tryProduce() != null) ||
         (p0.robot.target == ModuleType.LABORATORY && p0.tryProduce() != null)) {
       _state = StateType.PRODUCE;
     } // If (Robot'files are all diagnosed AND (Robot's storage is not full))
@@ -859,6 +895,20 @@ class State {
       case StateType.MOVING:
         Commands.move();
 
+        break;
+      case StateType.RESERVE:
+        // If Robot is not in MOLECULES Module, go there
+        if (ModuleType.MOLECULES != Game.player0.robot.target) {
+          Commands.goTo(ModuleType.MOLECULES);
+        }
+        // Else collect molecules
+        else {
+          if (molToReserve == null) {
+            molToReserve =
+                Game.availables.keys.firstWhere((k) => Game.availables[k] > 0);
+          }
+          Commands.connectMolecules(molToReserve);
+        }
         break;
       case StateType.CREATE:
         // If Robot is not in DIAGNOSIS Module, go there
