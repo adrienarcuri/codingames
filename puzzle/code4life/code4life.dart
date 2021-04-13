@@ -10,6 +10,13 @@ const ranksCosts = {
   2: [5, 8],
   3: [7, 14],
 };
+const ntot = 1000;
+
+final listOfFileCostsR2 = List<Map<MoleculeType, int>>.generate(
+    ntot, (int index) => Util._randomCosts2(2));
+final listOfFileCostsR3 = List<Map<MoleculeType, int>>.generate(
+    ntot, (int index) => Util._randomCosts2(3));
+
 enum MoleculeType { A, B, C, D, E }
 enum ModuleType { DIAGNOSIS, MOLECULES, LABORATORY, SAMPLES, CENTER }
 
@@ -110,6 +117,77 @@ class Util {
     });
     return map2.toString();
   }
+
+  static Map<MoleculeType, int> moleculetypeslistToMap(List<int> list) {
+    if (list.length != 5) {
+      throw Exception('List length is not equal to 5');
+    }
+
+    return {
+      MoleculeType.A: list[0],
+      MoleculeType.B: list[1],
+      MoleculeType.C: list[2],
+      MoleculeType.D: list[3],
+      MoleculeType.E: list[4],
+    };
+  }
+
+  /// Generate a random Costs 2
+
+  static Map<MoleculeType, int> _randomCosts2(int rank) {
+    Map<MoleculeType, int> fileCosts = {
+      MoleculeType.A: 0,
+      MoleculeType.B: 0,
+      MoleculeType.C: 0,
+      MoleculeType.D: 0,
+      MoleculeType.E: 0,
+    };
+
+    Map allRep = {
+      2: [
+        [0, 0, 5, 3, 0],
+        [3, 0, 3, 0, 2],
+        [0, 1, 4, 2, 0],
+        [3, 2, 2, 0, 0],
+        [0, 0, 0, 0, 6],
+        [0, 0, 0, 0, 5],
+      ],
+      3: [
+        [0, 0, 3, 6, 3],
+        [3, 3, 5, 3, 0],
+        [0, 0, 0, 7, 3],
+        [0, 0, 0, 7, 0],
+      ]
+    };
+
+    var rep = allRep[rank];
+
+    // Choose a repartition randomly
+    var listCost = rep[Random().nextInt(rep.length)]..shuffle();
+    fileCosts = Util.moleculetypeslistToMap(listCost);
+    return fileCosts;
+  }
+
+  /// Generate a random Costs
+  static Map<MoleculeType, int> _randomCosts(int rank) {
+    Map<MoleculeType, int> fileCosts = {
+      MoleculeType.A: 0,
+      MoleculeType.B: 0,
+      MoleculeType.C: 0,
+      MoleculeType.D: 0,
+      MoleculeType.E: 0,
+    };
+
+    var min = ranksCosts[rank][0];
+    var max = ranksCosts[rank][1];
+    var totalMol = min + Random().nextInt(max - min);
+
+    for (var i = 0; i < totalMol; i++) {
+      var mol = MoleculeType.values[Random().nextInt(5)];
+      fileCosts[mol]++;
+    }
+    return fileCosts;
+  }
 }
 
 /// PLAYER
@@ -198,58 +276,50 @@ class Player {
   int create() {
     /// Compute the probability the player has to produce a file with rank [r]
     double _prob(int rank) {
-      const ntot = 1000;
-
-      /// Generate a random Costs
-      Map<MoleculeType, int> _randomCosts() {
-        Map<MoleculeType, int> fileCosts = {
-          MoleculeType.A: 0,
-          MoleculeType.B: 0,
-          MoleculeType.C: 0,
-          MoleculeType.D: 0,
-          MoleculeType.E: 0,
-        };
-
-        var min = ranksCosts[rank][0];
-        var max = ranksCosts[rank][1];
-        var totalMol = min + Random().nextInt(max - min);
-
-        for (var i = 0; i < totalMol; i++) {
-          var mol = MoleculeType.values[Random().nextInt(5)];
-          fileCosts[mol]++;
-        }
-        return fileCosts;
-      }
-
       bool _isFeasible(Map<MoleculeType, int> costs) {
-        bool b =
-            MoleculeType.values.every((mt) => 3 + expertises[mt] >= costs[mt]);
-        return b;
+        bool b1 = MoleculeType.values.every(
+            (mt) => 5 + expertises[mt] + robot.storages[mt] >= costs[mt]);
+        var totalRealCost = MoleculeType.values
+            .map((mt) => (costs[mt] - expertises[mt] - robot.storages[mt]))
+            .reduce((a, b) => a + b);
+        bool b2 = totalRealCost <= robot.availableStorage;
+
+        return b1 && b2;
       }
 
-      var listOfFileCosts = List<Map<MoleculeType, int>>.generate(
-          ntot, (int index) => _randomCosts());
-
+      var n;
       //debug(listOfFileCosts);
       // Compute how many files are feasibles
-      var n = listOfFileCosts
-          .map(_isFeasible)
-          .fold(0, (p, n) => p + (n == true ? 1 : 0));
+      if (rank == 2) {
+        n = listOfFileCostsR2;
+      }
+      if (rank == 3) {
+        n = listOfFileCostsR3;
+      }
 
-      debug('n:$n');
+      n = n.map(_isFeasible).fold(0, (p, n) => p + (n == true ? 1 : 0));
 
       double prob = n / ntot;
-      debug('*** prob:$prob');
       return prob;
     }
 
     var rank = 1;
+    final prob2 = _prob(2);
+    final prob3 = _prob(3);
+    debug('*** prob2:$prob2, prob3:$prob3');
+
+    final rankCount2 = robot.getRankCount(2);
+    final rankCount3 = robot.getRankCount(3);
 
     // If expertise is greater or equal than 3 and number of files with rank 2 is less than 2, take a file of rank 2
-    if (_prob(2) > 0.96) {
+    if ((prob2 >= 0.85 && rankCount2 == 0) ||
+        (prob2 >= 0.9 && rankCount2 == 1) ||
+        (prob2 >= 0.95)) {
       rank = 2;
     }
-    if (_prob(3) > 0.96) {
+    if ((prob3 >= 0.75 && rankCount3 == 0) ||
+        (prob3 >= 0.80 && rankCount3 == 1) ||
+        (prob3 >= 0.95)) {
       rank = 3;
     }
     return rank;
@@ -748,7 +818,18 @@ class State {
     // If the robot is moving Moving, the state is MOVING
     if (p0.robot.eta > 0) {
       _state = StateType.MOVING;
-    } // If (Robot does not have files) OR (Robot does not have all diagnosed file AND Robot does not have max files)
+    }
+    // else if (p0.robot.files.isEmpty ||
+    //     (!p0.robot.isAllDiagFiles &&
+    //         p0.robot.files.length < 2 &&
+    //         p0.score < 2)) {
+    //   _state = StateType.CREATE;
+    // } else if (p0.robot.files.length == 2 &&
+    //     !p0.robot.isAllDiagFiles &&
+    //     p0.score < 2) {
+    //   _state = StateType.DIAGNOSE;
+    // }
+    // If (Robot does not have files) OR (Robot does not have all diagnosed file AND Robot does not have max files)
     else if (p0.robot.files.isEmpty ||
         (!p0.robot.isAllDiagFiles && !p0.robot.hasMaxFiles)) {
       _state = StateType.CREATE;
@@ -1059,6 +1140,7 @@ void main() {
 
     Game.updateFiles(newfiles);
     Game.turn++;
+    debug(Game.projects);
 
     /**
      * GAME LOGIC
