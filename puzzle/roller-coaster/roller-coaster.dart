@@ -13,7 +13,7 @@ class Carousel {
   /// Number of place in the carousel
   int size;
 
-  /// Number of times by day the carousel can day be used
+  /// Number of times by day the carousel can be used
   int count;
 
   /// List of groups of persons
@@ -34,6 +34,34 @@ class Carousel {
 
       return earned;
     }
+  }
+
+  /// Calculate the money earned for the [groups] for one turn
+  int earnByturn(List<int> groups) {
+    return groups
+        .map((nbOfpersons) => nbOfpersons * costPerPerson)
+        .reduce((a, b) => a + b);
+  }
+
+  /// Return [groups, index, persons] where:
+  /// - index: is the index of the last group which can enter
+  /// - groups: is the groups which can enter in the carousel
+  /// - persons: is the number of persons which can enter in
+  /// the carousel)
+  List<Object> fittedGroups() {
+    int persons = 0;
+
+    List<int> _groups = [];
+    int _index = 0;
+
+    while (persons <= size && _index <= groups.length) {
+      persons += groups.elementAt(_index);
+      if (persons <= size) {
+        _groups.add(groups.elementAt(_index));
+        _index++;
+      }
+    }
+    return [_index, persons, _groups];
   }
 
   @override
