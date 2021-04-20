@@ -1,0 +1,14 @@
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "roller_coaster",
+      "rootUri": "../",
+      "packageUri": "lib/",
+      "languageVersion": "2.5"
+    }
+  ],
+  "generated": "2021-04-20T17:19:55.541153Z",
+  "generator": "pub",
+  "generatorVersion": "2.12.0"
+}
