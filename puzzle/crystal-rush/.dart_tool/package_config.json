@@ -2,13 +2,13 @@
   "configVersion": 2,
   "packages": [
     {
-      "name": "roller_coaster",
+      "name": "crystal_rush",
       "rootUri": "../",
       "packageUri": "lib/",
       "languageVersion": "2.5"
     }
   ],
-  "generated": "2021-04-20T17:19:55.541153Z",
+  "generated": "2021-04-20T17:20:35.881905Z",
   "generator": "pub",
   "generatorVersion": "2.12.0"
 }
