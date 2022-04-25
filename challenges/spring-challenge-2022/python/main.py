@@ -11,19 +11,17 @@ heroes_per_player = int(input())  # Always 3
 def debug(msg):
     print(msg, file=sys.stderr, flush=True)
 
+
+def distance_to_my_base(x,y):
+    return math.dist([base_x,base_y],[x, y])
+
 class Entity():
     def __init__(self, id, entity_type, x, y):
         self.id = id
         self.entity_type = entity_type
         self.x = x
         self.y = y
-    # Create based on class name:
-    def factory(self):
-        if self.type == 0: return Monster(self)
-        if (self.type == 1 or self.type == 2): return Hero(self) 
-        assert 0, "Bad shape creation: " + type
-    factory = staticmethod(factory)
-
+    
 class Hero(Entity):
     def __init__(self, id, entity_type, x, y):
         super().__init__(id, entity_type, x, y)
@@ -34,15 +32,18 @@ class Monster(Entity):
         self.vx = vx
         self.vy = vy
         self.near_base = near_base
-        self.threatFor = threat_for
+        self.threat_for = threat_for
         super().__init__(id, entity_type, x, y)
+        
+        self.threat = self._threat()
 
     
-    def wait(self):
-        pass
-
-    def move(self, x, y):
-        pass
+    def _threat(self):
+        return 1/(1 + distance_to_my_base(self.x, self.y))
+    
+    def __str__(self):
+        debug(f'id:{self.id},theat:{self.threat}, entity_type:{self.entity_type}, x:{x}, y:{y}')
+    
     
 # game loop
 while True:
@@ -82,10 +83,14 @@ while True:
 
 
     for i in range(heroes_per_player):
-
-        # Write an action using print
+        
+        # Keep only monters which are a threat for me
+        monsters = [monster for monster in monsters if monster.threat_for  == 1]
         if monsters:
-            monster = monsters.pop()
+            monsters.sort(key=lambda x: x.threat, reverse=True)
+
+            monster = monsters[0]
+            
             print(f'MOVE {monster.x} {monster.y}')
         else:
             print('WAIT')
