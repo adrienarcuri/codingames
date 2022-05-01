@@ -4,13 +4,29 @@ import math
 # Auto-generated code below aims at helping you parse
 # the standard input according to the problem statement.
 
+# Constants
+BASE_VISIBILITY = 6000 + 1100
+HERO_VISIBILITY = 2200
+
+MAP_ZONE = ((0, 0),(17630, 9000))
+MAP_ZONE_TO_EXPLORE = [(BASE_VISIBILITY, BASE_VISIBILITY),(BASE_VISIBILITY, 0),(0, BASE_VISIBILITY)]
+
+#pi/2
+cosPI2 = math.sqrt(2)/2
+sinPI2 = cosPI2
+# pi/8
+cosPI8 = math.sqrt(2+math.sqrt(2))/2
+sinPI8 = math.sqrt(2-math.sqrt(2))/2
+
+MAP_ZONE_TO_EXPLORE = [(int(BASE_VISIBILITY * cosPI2), int(BASE_VISIBILITY * sinPI2)),(int(cosPI8 * BASE_VISIBILITY) ,int(sinPI8 *BASE_VISIBILITY)),(int(sinPI8 * BASE_VISIBILITY), int(cosPI8 * BASE_VISIBILITY))]
+
+
 # base_x: The corner of the map representing your base
 base_x, base_y = [int(i) for i in input().split()]
 heroes_per_player = int(input())  # Always 3
 
 def debug(msg):
     print(msg, file=sys.stderr, flush=True)
-
 
 def distance_to_my_base(x,y):
     return math.dist([base_x,base_y],[x, y])
@@ -44,7 +60,38 @@ class Monster(Entity):
     def __str__(self):
         debug(f'id:{self.id},theat:{self.threat}, entity_type:{self.entity_type}, x:{x}, y:{y}')
     
+
+class Commands():
+
+    @staticmethod
+    def _p(cmd, msg):
+        print(f'{cmd} {msg}')
+
+    @staticmethod
+    def wait():
+        cmd = 'WAIT'
+        msg = 'Attend ! 🕗'
+        Commands._p(cmd,msg)
+    @staticmethod
+    def move(x, y):
+        cmd = f'MOVE {x} {y}'
+        msg = 'Bouge ! 🏃‍♀️'
+        Commands._p(cmd,msg)
+
+    @staticmethod 
+    def spell(x, y):
+        cmd = f'SPELL WIND  {x} {y}'
+        msg = 'Et le vent souflera 💨'
+        Commands._p(cmd,msg)
     
+    @staticmethod
+    def shield(s):
+        cmd = f'SPELL SHIELD {s}'
+        msg = 'Bouclier 🛡'
+        Commands._p(cmd,msg)
+    
+    
+
 # game loop
 while True:
     monsters = []
@@ -84,15 +131,20 @@ while True:
 
     for i in range(heroes_per_player):
         
-        # Keep only monters which are a threat for me
+        # Garder uniquement les monstres qui sont une menace
         monsters = [monster for monster in monsters if monster.threat_for  == 1]
+        # S'il y a des monstres menaçants
         if monsters:
             monsters.sort(key=lambda x: x.threat, reverse=True)
 
             monster = monsters[0]
-            
-            print(f'MOVE {monster.x} {monster.y}')
+            Commands.move(monster.x, monster.y)
+        # S'il n'y a pas de monstre
+        elif not monsters:
+            # Explore
+            Commands.move(MAP_ZONE_TO_EXPLORE[i][0], MAP_ZONE_TO_EXPLORE[i][1])
+
         else:
-            print('WAIT')
+            Commands.wait()
             
                     
