@@ -16,3 +16,6 @@ Explorer s'il n'y a pas de menace (en début de partie)
 
 Positionner les héros à équidistance sur un cercle autour de ma base
 
+## Strategy 5
+
+Pousser les monstres que les héros rencontres vers la base ennemie.
