@@ -19,3 +19,7 @@ Positionner les héros à équidistance sur un cercle autour de ma base
 ## Strategy 5
 
 Pousser les monstres que les héros rencontres vers la base ennemie.
+
+## Strategy 6
+
+Correct algo when my base is not on the top left. 

@@ -23,16 +23,33 @@ sinPI2 = cosPI2
 cosPI8 = math.sqrt(2 + math.sqrt(2)) / 2
 sinPI8 = math.sqrt(2 - math.sqrt(2)) / 2
 
-MAP_ZONE_TO_EXPLORE = [
-    (int(BASE_VISIBILITY * cosPI2), int(BASE_VISIBILITY * sinPI2)),
-    (int(cosPI8 * BASE_VISIBILITY), int(sinPI8 * BASE_VISIBILITY)),
-    (int(sinPI8 * BASE_VISIBILITY), int(cosPI8 * BASE_VISIBILITY)),
-]
-
 
 # base_x: The corner of the map representing your base
 BASE_X, BASE_Y = [int(i) for i in input().split()]
+ENNEMY_BASE_X, ENNEMY_BASE_Y = [MAP_ZONE[1][0] - BASE_X, MAP_ZONE[1][1] - BASE_Y]
 heroes_per_player = int(input())  # Always 3
+
+if BASE_X == 0:
+    MAP_ZONE_TO_EXPLORE = [
+        (int(BASE_VISIBILITY * cosPI2), int(BASE_VISIBILITY * sinPI2)),
+        (int(cosPI8 * BASE_VISIBILITY), int(sinPI8 * BASE_VISIBILITY)),
+        (int(sinPI8 * BASE_VISIBILITY), int(cosPI8 * BASE_VISIBILITY)),
+    ]
+else:
+    MAP_ZONE_TO_EXPLORE = [
+        (
+            BASE_X - int(BASE_VISIBILITY * cosPI2),
+            BASE_Y - int(BASE_VISIBILITY * sinPI2),
+        ),
+        (
+            BASE_X - int(cosPI8 * BASE_VISIBILITY),
+            BASE_Y - int(sinPI8 * BASE_VISIBILITY),
+        ),
+        (
+            BASE_X - int(sinPI8 * BASE_VISIBILITY),
+            BASE_Y - int(cosPI8 * BASE_VISIBILITY),
+        ),
+    ]
 
 
 def debug(msg):
@@ -115,7 +132,7 @@ class Commands:
 
     @staticmethod
     def spell_ennemy_base():
-        Commands.spell(MAP_ZONE[1][0], MAP_ZONE[1][1])
+        Commands.spell(ENNEMY_BASE_X, ENNEMY_BASE_Y)
 
     @staticmethod
     def shield(s):
