@@ -83,6 +83,12 @@ class Entity:
         """Return distance to entity e"""
         return math.dist([self.x, self.y], [e.x, e.y])
 
+    def distance_base(self):
+        return distance_to_my_base(self.x, self.y)
+
+    def __str__(self):
+        return f"id:{self.id}, entity_type:{self.entity_type}, x:{self.x}, y:{self.y}"
+
 
 class Hero(Entity):
     def __init__(self, id, entity_type, x, y):
@@ -101,7 +107,17 @@ class Monster(Entity):
         self.threat = self._threat()
 
     def _threat(self):
-        return 1 / (1 + distance_to_my_base(self.x, self.y))
+        threat_score = 0
+        # Menace pour personne
+        if threat_for == 0:
+            threat_score = 0
+        # Menace pour moi
+        elif threat_for == 1:
+            threat_score = 0
+        # Menace pour l'ennemi
+        elif threat_for == 2:
+            threat_score = -1
+        return threat_score + 1 / (1 + distance_to_my_base(self.x, self.y))
 
     def __str__(self):
         return f"id:{self.id},theat:{self.threat}, entity_type:{self.entity_type}, x:{x}, y:{y}"
@@ -139,6 +155,17 @@ class Commands:
         cmd = f"SPELL SHIELD {s}"
         msg = "Bouclier 🛡"
         Commands._p(cmd, msg)
+
+    @staticmethod
+    def control(entityId, x, y):
+        cmd = f"CONTROL {entityId} {x} {y}"
+        msg = "Control ✇"
+        Commands._p(cmd, msg)
+
+    @staticmethod
+    def control_ennemy_base(entityId):
+        debug
+        Commands.control(entityId, ENNEMY_BASE_X, ENNEMY_BASE_Y)
 
 
 # game loop
@@ -195,33 +222,77 @@ while True:
             )
         # If my Hero
         elif _type == 1:
-            myHeroes.append(Hero(id=_id, entity_type=_type, x=x, y=y))
+            h = Hero(_id, _type, x, y)
+            myHeroes.append(h)
+            debug(h)
         # If ennemy Hero
         elif _type == 2:
             pass
         else:
             assert False
 
-    for i in range(heroes_per_player):
-        myHero = myHeroes[i]
+    # On ne garde pas les monstres qui sont une menace pour la base ennemie
+    monsters = [monster for monster in monsters if monster.threat_for != 2]
 
-        # Garder uniquement les monstres qui sont une menace
-        monsters = [monster for monster in monsters if monster.threat_for == 1]
-        # S'il y a des monstres menaçants
-        if monsters:
-            monsters.sort(key=lambda x: x.threat, reverse=True)
+    # Si aucun monstre visible
+    if not monsters:
+        for j in range(heroes_per_player):
+            debug(j)
+            debug(len(myHeroes))
+            myHero = myHeroes[j]
+            # Explorer
+            Commands.move(MAP_ZONE_TO_EXPLORE[j][0], MAP_ZONE_TO_EXPLORE[j][1])
+    # Sinon
+    elif monsters:
+        # Classement des monstres par ordre de menace décroissante
+        monsters.sort(key=lambda x: x.threat, reverse=False)
+        # Pour chaque monstre
+        couples = {0: -1, 1: -1, 2: -1}
+        for monster in monsters:
+            # Déterminer le hero le plus proche
+            heroes = myHeroes.copy()
+            for h in heroes:
+                
+                d_best = 10000000000
+                d = monster.distanceTo(h)
+                if d < d_best:
+                    my_nearest_Hero = h
+                    d_best = d
+            couples[my_nearest_Hero.id] = monster
+            heroes.remove(my_nearest_Hero)
 
-            monster = monsters[0]
-            # Si j'ai assez de mana et que le    est à bonne distance du héro
-            if playerInfos[0].mana >= MIN_MANA and myHero.distanceTo(monster) < 1280:
-                Commands.spell_ennemy_base()
-                playerInfos[0].mana -= 10
+        for i in range(heroes_per_player):
+            if couples[i] != -1:
+                monster = couples[i]
+                # Si j'ai assez de mana
+                if playerInfos[0].mana >= MIN_MANA:
+                    # Si le monstre est à porté de ma base
+                    if monster.distance_base() < 5000:
+                        # Si monstre à porté pour sort wind.
+                        if monster.distanceTso(myHero) < 1280:
+                            # Sort Vent vers la base ennemie
+                            Commands.spell_ennemy_base()
+                            playerInfos[0].mana -= 10
+                        # Si monstre à porté pour sort control:
+                        elif monster.distanceTo(myHero) < 2200:
+                            # Sort Control vers la base ennemie
+                            Commands.control_ennemy_base(monster.id)
+                            playerInfos[0].mana -= 10
+                        # Sinon
+                        else:
+                            Commands.move(monster.x, monster.y)
+                    # Sinon
+                    else:
+                        # Sort Control vers la base ennemie
+                        Commands.control_ennemy_base(monster.id)
+                        playerInfos[0].mana -= 10
+
+                # Sinon si je n'ai pas assez de mana
+                else:
+                    # Avance vers le monstre
+                    Commands.move(monster.x, monster.y)
             else:
-                Commands.move(monster.x, monster.y)
-        # S'il n'y a pas de monstre
-        elif not monsters:
-            # Explore
-            Commands.move(MAP_ZONE_TO_EXPLORE[i][0], MAP_ZONE_TO_EXPLORE[i][1])
+                Commands.wait()
 
         else:
             Commands.wait()

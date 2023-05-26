@@ -22,4 +22,8 @@ Pousser les monstres que les héros rencontres vers la base ennemie.
 
 ## Strategy 6
 
-Correct algo when my base is not on the top left. 
+Corriger l'algo si ma base est en bas à droite. 
+
+## Strategy 7
+
+Allez combattre les montres dès qu'ils sont visibles même s'ils ne cible pas ma base.
